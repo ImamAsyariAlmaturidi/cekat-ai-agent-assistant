@@ -1,5 +1,3 @@
-import { StartScreenPrompt } from "@openai/chatkit";
-
 export const CHATKIT_API_URL =
   import.meta.env.VITE_CHATKIT_API_URL ?? "/chatkit";
 
@@ -16,29 +14,39 @@ export const FACTS_API_URL = import.meta.env.VITE_FACTS_API_URL ?? "/facts";
 
 export const THEME_STORAGE_KEY = "chatkit-boilerplate-theme";
 
-export const GREETING = "Welcome to the ChatKit Demo";
+export const GREETING = "Selamat datang di Cekat AI Assistant! Saya siap membantu Anda dengan platform Cekat AI.";
 
-export const STARTER_PROMPTS: StartScreenPrompt[] = [
+export const STARTER_PROMPTS = [
   {
-    label: "What can you do?",
-    prompt: "What can you do?",
+    label: "Apa itu Cekat AI?",
+    prompt: "Apa itu Cekat AI dan fitur-fiturnya?",
     icon: "circle-question",
   },
   {
-    label: "My name is Kaz",
-    prompt: "My name is Kaz",
-    icon: "book-open",
+    label: "Buka Dashboard Cekat",
+    prompt: "Buka dashboard Cekat",
+    icon: "chart-line",
   },
   {
-    label: "What's the weather in Paris?",
-    prompt: "What's the weather in Paris?",
-    icon: "search",
+    label: "Cara Setup Chatbot",
+    prompt: "Bagaimana cara setup chatbot di Cekat AI?",
+    icon: "robot",
   },
   {
-    label: "Change the theme to dark mode",
-    prompt: "Change the theme to dark mode",
-    icon: "sparkle",
+    label: "Integrasi Platform",
+    prompt: "Platform apa saja yang bisa diintegrasikan dengan Cekat AI?",
+    icon: "link",
+  },
+  {
+    label: "API Documentation",
+    prompt: "Tunjukkan dokumentasi API Cekat AI",
+    icon: "code",
+  },
+  {
+    label: "Workflow Automation",
+    prompt: "Bagaimana cara membuat workflow automation di Cekat?",
+    icon: "workflow",
   },
 ];
 
-export const PLACEHOLDER_INPUT = "Share a fact about yourself";
+export const PLACEHOLDER_INPUT = "Tanyakan tentang Cekat AI atau platform omnichannel...";

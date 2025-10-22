@@ -13,7 +13,7 @@ from chatkit.server import StreamingResult, ChatKitServer
 from chatkit.store import AttachmentStore, AttachmentCreateParams
 from chatkit.types import FileAttachment, ImageAttachment, Attachment
 from fastapi import Depends, FastAPI, HTTPException, Request, status, UploadFile, File
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 

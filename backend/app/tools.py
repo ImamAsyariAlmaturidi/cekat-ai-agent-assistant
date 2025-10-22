@@ -200,11 +200,10 @@ async def match_cekat_docs_v1(
 async def navigate_to_url(
     ctx: RunContextWrapper[FactAgentContext],
     url: str,
-    open_in_new_tab: bool = True,
     description: str = "",
 ) -> dict[str, str | None]:
     """Navigasi ke URL atau buka tab baru dengan hardcoded Cekat URLs."""
-    print("[NavigateTool] tool invoked", {"url": url, "open_in_new_tab": open_in_new_tab})
+    print("[NavigateTool] tool invoked", {"url": url, "force_new_tab": True})
     
     # Hardcoded Cekat URLs mapping
     cekat_urls = {
@@ -264,14 +263,13 @@ async def navigate_to_url(
             name="navigate_to_url",
             arguments={
                 "url": url,
-                "open_in_new_tab": open_in_new_tab,
+                "open_in_new_tab": True,
                 "description": description or f"Navigasi ke {url}"
             },
         )
         
         return {
             "url": url,
-            "open_in_new_tab": open_in_new_tab,
             "description": description,
             "status": "success"
         }

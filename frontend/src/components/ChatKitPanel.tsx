@@ -111,8 +111,37 @@ export function ChatKitPanel({
         }
 
         try {
-          // Always navigate in the same tab/window
-          window.location.href = url;
+          if (openInNewTab) {
+            console.log(
+              "[ChatKitPanel] Attempting to open URL in new tab:",
+              url
+            );
+            const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+
+            if (newWindow) {
+              console.log("[ChatKitPanel] Successfully opened new tab");
+              // Focus the new window
+              newWindow.focus();
+            } else {
+              console.warn(
+                "[ChatKitPanel] Failed to open new tab - popup blocked?"
+              );
+              // Try alternative method: create link and click it
+              console.log("[ChatKitPanel] Trying link click method");
+              const link = document.createElement("a");
+              link.href = url;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              link.style.display = "none";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              console.log("[ChatKitPanel] Used link click method");
+            }
+          } else {
+            console.log("[ChatKitPanel] Navigating in current tab:", url);
+            window.location.href = url;
+          }
           return { success: true };
         } catch (error) {
           console.error("[ChatKitPanel] Navigation failed", error);
@@ -150,8 +179,38 @@ export function ChatKitPanel({
           if (action.type === "navigation.open") {
             const url = action.payload?.url;
             if (url) {
-              console.log("[ChatKitPanel] Opening URL:", url);
-              window.open(url, "_blank", "noopener,noreferrer");
+              console.log("[ChatKitPanel] Widget action - Opening URL:", url);
+              const newWindow = window.open(
+                url,
+                "_blank",
+                "noopener,noreferrer"
+              );
+
+              if (newWindow) {
+                console.log(
+                  "[ChatKitPanel] Widget action - Successfully opened new tab"
+                );
+                newWindow.focus();
+              } else {
+                console.warn(
+                  "[ChatKitPanel] Widget action - Failed to open new tab - popup blocked?"
+                );
+                // Try alternative method: create link and click it
+                console.log(
+                  "[ChatKitPanel] Widget action - Trying link click method"
+                );
+                const link = document.createElement("a");
+                link.href = url;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                console.log(
+                  "[ChatKitPanel] Widget action - Used link click method"
+                );
+              }
             }
           }
 

@@ -26,7 +26,14 @@ export function ChatKitPanel({
   const processedFacts = useRef(new Set<string>());
 
   const chatkit = useChatKit({
-    api: { url: CHATKIT_API_URL, domainKey: CHATKIT_API_DOMAIN_KEY },
+    api: {
+      url: CHATKIT_API_URL,
+      domainKey: CHATKIT_API_DOMAIN_KEY,
+      uploadStrategy: {
+        type: "direct",
+        uploadUrl: `${CHATKIT_API_URL}/files`,
+      },
+    },
     theme: {
       colorScheme: theme,
       color: {
@@ -48,6 +55,12 @@ export function ChatKitPanel({
     },
     composer: {
       placeholder: PLACEHOLDER_INPUT,
+      attachments: {
+        enabled: true,
+        maxSize: 20 * 1024 * 1024, // 20MB per file
+        maxCount: 3,
+        accept: { "application/pdf": [".pdf"], "image/*": [".png", ".jpg"] },
+      },
     },
     threadItemActions: {
       feedback: false,
@@ -80,6 +93,33 @@ export function ChatKitPanel({
         return { success: true };
       }
 
+      if (invocation.name === "navigate_to_url") {
+        const url = String(invocation.params.url ?? "");
+        const openInNewTab = Boolean(invocation.params.open_in_new_tab ?? true);
+        const description = String(invocation.params.description ?? "");
+
+        if (!url) {
+          return { success: false };
+        }
+
+        if (import.meta.env.DEV) {
+          console.debug("[ChatKitPanel] navigate_to_url", {
+            url,
+            openInNewTab,
+            description,
+          });
+        }
+
+        try {
+          // Always navigate in the same tab/window
+          window.location.href = url;
+          return { success: true };
+        } catch (error) {
+          console.error("[ChatKitPanel] Navigation failed", error);
+          return { success: false };
+        }
+      }
+
       return { success: false };
     },
     onResponseEnd: () => {
@@ -91,6 +131,36 @@ export function ChatKitPanel({
     onError: ({ error }) => {
       // ChatKit handles displaying the error to the user
       console.error("ChatKit error", error);
+    },
+    widgets: {
+      async onAction(action, item) {
+        console.log("[ChatKitPanel] Widget action received:", { action, item });
+
+        try {
+          const response = await fetch("/api/widget-action", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action, itemId: item.id }),
+          });
+
+          const result = await response.json();
+          console.log("[ChatKitPanel] Widget action response:", result);
+
+          // Handle specific action types
+          if (action.type === "navigation.open") {
+            const url = action.payload?.url;
+            if (url) {
+              console.log("[ChatKitPanel] Opening URL:", url);
+              window.open(url, "_blank", "noopener,noreferrer");
+            }
+          }
+
+          return result;
+        } catch (error) {
+          console.error("[ChatKitPanel] Widget action failed:", error);
+          return { success: false, error: error.message };
+        }
+      },
     },
   });
 

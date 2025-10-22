@@ -3,10 +3,12 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Sequence
+from typing import Sequence, Union
 
 from chatkit.widgets import (
+    ActionConfig,
     Box,
+    Button,
     Card,
     Col,
     Image,
@@ -736,6 +738,62 @@ def _wind_direction_to_cardinal(direction: float | None) -> str | None:
     directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     index = int((degrees + 22.5) // 45) % len(directions)
     return directions[index]
+
+
+# URL Widget Components
+@dataclass(frozen=True)
+class UrlWidgetData:
+    """Data structure for URL navigation widget."""
+    label: str
+    url: str
+    description: Union[str, None] = None
+
+
+def render_url_widget(data: UrlWidgetData) -> Card:
+    """Build a URL navigation widget."""
+    
+    # Create button
+    button = Button(
+        color="primary",
+        label=data.label,
+        style="primary",
+        iconEnd="external-link",
+        block=True,
+        onClickAction=ActionConfig(
+            type="client_tool_call",
+            payload={
+                "name": "navigate_to_url",
+                "arguments": {
+                    "url": data.url,
+                    "open_in_new_tab": True,
+                    "description": f"Navigating to {data.url}"
+                }
+            }
+        )
+    )
+    
+    # Create children list
+    children = [button]
+    
+    # Add description if provided
+    if data.description:
+        description_text = Text(
+            value=data.description,
+            color="secondary",
+            size="sm"
+        )
+        children.append(description_text)
+    
+    return Card(
+        key="url_widget",
+        padding=4,
+        children=children
+    )
+
+
+def url_widget_copy_text(data: UrlWidgetData) -> str:
+    """Generate copy text for URL widget."""
+    return f"{data.label}: {data.url}"
 
 
 def _compact(items: Sequence[WidgetComponent | None]) -> list[WidgetComponent]:

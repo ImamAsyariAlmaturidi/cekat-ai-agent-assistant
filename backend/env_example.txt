@@ -1,0 +1,17 @@
+# ChatKit Backend Environment Variables
+# Copy this file to .env and fill in your actual values
+
+# OpenAI API Key (WAJIB - Required)
+# Get your API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=sk-proj-your-openai-api-key-here
+
+# ChatKit Domain Key (untuk development bisa pakai placeholder)
+# Untuk production, dapatkan dari: https://platform.openai.com/settings/organization/security/domain-allowlist
+VITE_CHATKIT_API_DOMAIN_KEY=domain_pk_local_dev
+
+# Optional: Custom API URLs (jika tidak di-set, akan menggunakan default)
+# VITE_CHATKIT_API_URL=http://127.0.0.1:8000
+# VITE_FACTS_API_URL=http://127.0.0.1:8000
+
+# Python path untuk development
+PYTHONPATH=.

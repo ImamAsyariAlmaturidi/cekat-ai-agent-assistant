@@ -154,22 +154,59 @@ class MemoryStore(Store[dict[str, Any]]):
         attachment: Attachment,
         context: dict[str, Any],
     ) -> None:
-        raise NotImplementedError(
-            "MemoryStore does not persist attachments. Provide a Store implementation "
-            "that enforces authentication and authorization before enabling uploads."
-        )
+        """Save attachment metadata to the attachment store."""
+        # Import here to avoid circular imports
+        from .main import attachment_store
+        
+        # Store attachment metadata
+        attachment_store.metadata_store[attachment.id] = {
+            "filename": attachment.name,
+            "content_type": attachment.mime_type,
+            "size": getattr(attachment, 'size', 0),
+            "status": "saved",
+            "attachment": attachment
+        }
 
     async def load_attachment(
         self,
         attachment_id: str,
         context: dict[str, Any],
     ) -> Attachment:
-        raise NotImplementedError(
-            "MemoryStore does not load attachments. Provide a Store implementation "
-            "that enforces authentication and authorization before enabling uploads."
-        )
+        """Load attachment from the attachment store."""
+        # Import here to avoid circular imports
+        from .main import attachment_store
+        
+        if attachment_id not in attachment_store.metadata_store:
+            raise ValueError(f"Attachment {attachment_id} not found")
+        
+        metadata = attachment_store.metadata_store[attachment_id]
+        
+        # Return the stored attachment object
+        if "attachment" in metadata:
+            return metadata["attachment"]
+        
+        # Fallback: create attachment from metadata
+        from chatkit.types import FileAttachment, ImageAttachment
+        
+        if metadata["content_type"].startswith("image/"):
+            return ImageAttachment(
+                id=attachment_id,
+                name=metadata["filename"],
+                mime_type=metadata["content_type"],
+                url=f"http://localhost:8000/chatkit/files/{attachment_id}/download",
+                preview_url=f"http://localhost:8000/chatkit/files/{attachment_id}/download"
+            )
+        else:
+            return FileAttachment(
+                id=attachment_id,
+                name=metadata["filename"],
+                mime_type=metadata["content_type"]
+            )
 
     async def delete_attachment(self, attachment_id: str, context: dict[str, Any]) -> None:
-        raise NotImplementedError(
-            "MemoryStore does not delete attachments because they are never stored."
-        )
+        """Delete attachment from the attachment store."""
+        # Import here to avoid circular imports
+        from .main import attachment_store
+        
+        if attachment_id in attachment_store.metadata_store:
+            del attachment_store.metadata_store[attachment_id]

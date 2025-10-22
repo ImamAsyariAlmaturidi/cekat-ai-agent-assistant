@@ -18,6 +18,11 @@ export default defineConfig({
         target: backendTarget,
         changeOrigin: true,
       },
+      "/files": {
+        target: "https://api.openai.com/v1",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/files/, "/v1/files"),
+      },
     },
     // For production deployments, you need to add your public domains to this list
     allowedHosts: [

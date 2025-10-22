@@ -3,6 +3,10 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from supabase import create_client, Client
 from openai import OpenAI
@@ -80,8 +84,8 @@ class CekatDocsRAG:
             # Search using Supabase RPC function - get top 10 documents
             result = self.supabase.rpc('match_documents', {
                 'query_embedding': query_embedding,
-                'match_threshold': 0.5,  # Lower threshold to get more results
-                'match_count': limit
+                'match_count': limit,
+                'filter': {}  # Empty filter to get all documents
             }).execute()
             
             if result.data:

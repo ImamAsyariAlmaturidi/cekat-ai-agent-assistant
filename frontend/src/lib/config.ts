@@ -14,7 +14,8 @@ export const FACTS_API_URL = import.meta.env.VITE_FACTS_API_URL ?? "/facts";
 
 export const THEME_STORAGE_KEY = "chatkit-boilerplate-theme";
 
-export const GREETING = "Selamat datang di Cekat AI Assistant! Saya siap membantu Anda dengan platform Cekat AI.";
+export const GREETING =
+  "Selamat datang di Cekat AI Assistant! Saya siap membantu Anda dengan platform Cekat AI.";
 
 export const STARTER_PROMPTS = [
   {
@@ -23,12 +24,12 @@ export const STARTER_PROMPTS = [
     icon: "circle-question",
   },
   {
-    label: "Buka Dashboard Cekat",
+    label: "Buka Dashboard",
     prompt: "Buka dashboard Cekat",
     icon: "chart-line",
   },
   {
-    label: "Cara Setup Chatbot",
+    label: "Setup Chatbot",
     prompt: "Bagaimana cara setup chatbot di Cekat AI?",
     icon: "robot",
   },
@@ -49,4 +50,5 @@ export const STARTER_PROMPTS = [
   },
 ];
 
-export const PLACEHOLDER_INPUT = "Tanyakan tentang Cekat AI atau platform omnichannel...";
+export const PLACEHOLDER_INPUT =
+  "Tanyakan tentang Cekat AI atau platform omnichannel...";

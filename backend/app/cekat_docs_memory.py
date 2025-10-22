@@ -17,15 +17,24 @@ class CekatDocsRAG:
     def __init__(self):
         """Initialize Supabase client and OpenAI client."""
         # Supabase configuration
-        self.supabase_url = os.getenv("SUPABASE_URL", "https://your-project.supabase.co")
-        self.supabase_key = os.getenv("SUPABASE_ANON_KEY", "your-anon-key")
+        self.supabase_url = os.getenv("SUPABASE_URL")
+        self.supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        
+        # Check if Supabase is configured
+        if not self.supabase_url or not self.supabase_key:
+            logger.warning("Supabase not configured - URL or key missing")
+            logger.info("Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables to enable Supabase")
         
         # Initialize clients with error handling
-        try:
-            self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
-            logger.info("Supabase client initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize Supabase client: {e}")
+        if self.supabase_url and self.supabase_key:
+            try:
+                self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
+                logger.info("Supabase client initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize Supabase client: {e}")
+                self.supabase = None
+        else:
+            logger.warning("Supabase not configured, setting client to None")
             self.supabase = None
         
         try:
@@ -57,7 +66,13 @@ class CekatDocsRAG:
             
             if not self.supabase:
                 logger.error("Supabase client not available")
-                return []
+                return [{
+                    "title": "Supabase Not Configured",
+                    "content": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables to enable document search.",
+                    "url": "",
+                    "category": "system",
+                    "similarity": 0
+                }]
             
             # Generate embedding for query
             response = self.openai_client.embeddings.create(
@@ -91,7 +106,13 @@ class CekatDocsRAG:
         try:
             if not self.supabase:
                 logger.error("Supabase client not available for fallback search")
-                return []
+                return [{
+                    "title": "Supabase Not Configured",
+                    "content": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables to enable document search.",
+                    "url": "",
+                    "category": "system",
+                    "similarity": 0
+                }]
                 
             # Simple text search using Supabase
             result = self.supabase.table(self.docs_table).select("*").ilike("content", f"%{query}%").limit(limit).execute()

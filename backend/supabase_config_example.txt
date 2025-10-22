@@ -13,9 +13,8 @@ OPENAI_API_KEY=your-openai-api-key
 DATABASE_URL=postgresql://postgres:password@db.your-project-id.supabase.co:5432/postgres
 
 # Memory System Configuration
-CEKAT_DOCS_TABLE=cekat_docs
-CEKAT_EMBEDDINGS_TABLE=cekat_docs_embeddings
-EMBEDDING_MODEL=text-embedding-ada-002
+DOCUMENTS_TABLE=documents
+EMBEDDING_MODEL=text-embedding-3-small
 MAX_CHUNK_LENGTH=1000
 SIMILARITY_THRESHOLD=0.7
 MAX_SEARCH_RESULTS=5

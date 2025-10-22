@@ -50,8 +50,8 @@ class CekatDocsRAG:
             self.openai_client = None
         
         # Table names
-        self.docs_table = "cekat_docs"
-        self.embeddings_table = "cekat_docs_embeddings"
+        self.docs_table = "documents"
+        self.embeddings_table = "documents"  # Using same table for simplicity
         
         logger.info("CekatDocsRAG initialized")
     
@@ -74,16 +74,16 @@ class CekatDocsRAG:
                     "similarity": 0
                 }]
             
-            # Generate embedding for query
+            # Generate embedding for query using small model
             response = self.openai_client.embeddings.create(
-                model="text-embedding-ada-002",
+                model="text-embedding-3-small",
                 input=query
             )
             
             query_embedding = response.data[0].embedding
             
-            # Search using Supabase RPC function (assuming it exists)
-            result = self.supabase.rpc('search_cekat_docs', {
+            # Search using Supabase RPC function
+            result = self.supabase.rpc('match_documents', {
                 'query_embedding': query_embedding,
                 'match_threshold': 0.7,
                 'match_count': limit

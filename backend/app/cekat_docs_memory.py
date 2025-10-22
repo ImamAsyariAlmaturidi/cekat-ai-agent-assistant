@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from supabase import create_client, Client
 from openai import OpenAI
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,23 +57,17 @@ class CekatDocsRAG:
         logger.info("CekatDocsRAG initialized")
     
     
-    def search_docs(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def search_docs(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for relevant Cekat documentation using vector similarity."""
         try:
             # Check if clients are available
             if not self.openai_client:
-                logger.warning("OpenAI client not available, using fallback search")
-                return self._fallback_search(query, limit)
+                logger.warning("OpenAI client not available")
+                return []
             
             if not self.supabase:
                 logger.error("Supabase client not available")
-                return [{
-                    "title": "Supabase Not Configured",
-                    "content": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables to enable document search.",
-                    "url": "",
-                    "category": "system",
-                    "similarity": 0
-                }]
+                return []
             
             # Generate embedding for query using small model
             response = self.openai_client.embeddings.create(
@@ -82,10 +77,10 @@ class CekatDocsRAG:
             
             query_embedding = response.data[0].embedding
             
-            # Search using Supabase RPC function
+            # Search using Supabase RPC function - get top 10 documents
             result = self.supabase.rpc('match_documents', {
                 'query_embedding': query_embedding,
-                'match_threshold': 0.7,
+                'match_threshold': 0.5,  # Lower threshold to get more results
                 'match_count': limit
             }).execute()
             
@@ -98,34 +93,8 @@ class CekatDocsRAG:
                 
         except Exception as e:
             logger.error(f"Error searching documents: {e}")
-            # Fallback to simple text search if vector search fails
-            return self._fallback_search(query, limit)
-    
-    def _fallback_search(self, query: str, limit: int) -> List[Dict[str, Any]]:
-        """Fallback text search if vector search is not available."""
-        try:
-            if not self.supabase:
-                logger.error("Supabase client not available for fallback search")
-                return [{
-                    "title": "Supabase Not Configured",
-                    "content": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables to enable document search.",
-                    "url": "",
-                    "category": "system",
-                    "similarity": 0
-                }]
-                
-            # Simple text search using Supabase
-            result = self.supabase.table(self.docs_table).select("*").ilike("content", f"%{query}%").limit(limit).execute()
-            
-            if result.data:
-                logger.info(f"Fallback search found {len(result.data)} documents")
-                return result.data
-            else:
-                return []
-                
-        except Exception as e:
-            logger.error(f"Error in fallback search: {e}")
             return []
+    
 
 
 # Global instance

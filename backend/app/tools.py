@@ -180,8 +180,8 @@ async def match_cekat_docs_v1(
         # Get RAG instance
         rag = get_cekat_docs_rag()
         
-        # Search for relevant documents
-        results = rag.search_docs(query, limit=5)
+        # Search for relevant documents - get top 10
+        results = rag.search_docs(query, limit=10)
         
         if results:
             # Format results for the AI

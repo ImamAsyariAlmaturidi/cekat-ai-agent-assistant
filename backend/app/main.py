@@ -26,13 +26,13 @@ from .server import (
     create_chatkit_server,
 )
 from .facts import fact_store
+from .s3_client import get_cekat_s3_client
 
-class LocalAttachmentStore(AttachmentStore):
-    """Local file storage implementation for ChatKit attachments."""
+class S3AttachmentStore(AttachmentStore):
+    """S3 file storage implementation for ChatKit attachments."""
     
-    def __init__(self, storage_dir: str = "uploads"):
-        self.storage_dir = Path(storage_dir)
-        self.storage_dir.mkdir(exist_ok=True)
+    def __init__(self):
+        self.s3_client = get_cekat_s3_client()
         # Simple in-memory metadata store (in production, use a database)
         self.metadata_store: Dict[str, Dict[str, Any]] = {}
     
@@ -41,15 +41,16 @@ class LocalAttachmentStore(AttachmentStore):
         unique_string = f"{mime_type}_{uuid.uuid4()}"
         return hashlib.md5(unique_string.encode()).hexdigest()
     
-    def _get_file_path(self, attachment_id: str) -> Path:
-        """Get file path for attachment ID."""
-        return self.storage_dir / f"{attachment_id}"
+    def _get_s3_key(self, attachment_id: str) -> str:
+        """Get S3 key for attachment ID."""
+        return f"attachments/{attachment_id}"
     
     async def create_attachment(self, input: AttachmentCreateParams, context: Any) -> Attachment:
         """Create attachment metadata and return upload URL."""
         try:
             # Generate attachment ID
             attachment_id = self.generate_attachment_id(input.mime_type, context)
+            s3_key = self._get_s3_key(attachment_id)
             
             # Create attachment object based on type
             if input.mime_type.startswith("image/"):
@@ -58,8 +59,8 @@ class LocalAttachmentStore(AttachmentStore):
                     name=input.name or "image",
                     mime_type=input.mime_type,
                     size=input.size,
-                    url=f"http://localhost:8000/chatkit/files/{attachment_id}/download",
-                    preview_url=f"http://localhost:8000/chatkit/files/{attachment_id}/download"
+                    url=f"https://{self.s3_client.bucket_name}.s3.{self.s3_client.region}.amazonaws.com/{s3_key}",
+                    preview_url=f"https://{self.s3_client.bucket_name}.s3.{self.s3_client.region}.amazonaws.com/{s3_key}"
                 )
             else:
                 attachment = FileAttachment(
@@ -75,7 +76,8 @@ class LocalAttachmentStore(AttachmentStore):
                 "content_type": input.mime_type,
                 "size": input.size,
                 "status": "pending",
-                "attachment": attachment
+                "attachment": attachment,
+                "s3_key": s3_key
             }
             
             # Set upload URL for two-phase upload
@@ -98,10 +100,13 @@ class LocalAttachmentStore(AttachmentStore):
                     detail="Attachment not found"
                 )
             
-            # Delete file from disk
-            file_path = self._get_file_path(attachment_id)
-            if file_path.exists():
-                file_path.unlink()
+            # Delete file from S3
+            metadata = self.metadata_store[attachment_id]
+            s3_key = metadata.get("s3_key")
+            if s3_key:
+                result = self.s3_client.delete_file(s3_key)
+                if not result["success"]:
+                    print(f"Warning: Failed to delete S3 file {s3_key}: {result['error']}")
             
             # Remove metadata
             del self.metadata_store[attachment_id]
@@ -117,15 +122,39 @@ class LocalAttachmentStore(AttachmentStore):
     async def get_attachment_bytes(self, attachment_id: str) -> bytes:
         """Get attachment file bytes for Agent SDK integration."""
         try:
-            file_path = self._get_file_path(attachment_id)
-            if not file_path.exists():
+            if attachment_id not in self.metadata_store:
                 raise HTTPException(
                     status_code=404,
-                    detail="File not found"
+                    detail="Attachment not found"
                 )
             
-            with open(file_path, "rb") as f:
-                return f.read()
+            metadata = self.metadata_store[attachment_id]
+            s3_key = metadata.get("s3_key")
+            if not s3_key:
+                raise HTTPException(
+                    status_code=404,
+                    detail="S3 key not found for attachment"
+                )
+            
+            # Download file from S3 to temporary location
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                result = self.s3_client.download_file(s3_key, temp_file.name)
+                if not result["success"]:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Failed to download from S3: {result['error']}"
+                    )
+                
+                # Read the downloaded file
+                with open(temp_file.name, "rb") as f:
+                    content = f.read()
+                
+                # Clean up temp file
+                import os
+                os.unlink(temp_file.name)
+                
+                return content
                 
         except HTTPException:
             raise
@@ -147,7 +176,7 @@ app.add_middleware(
 )
 
 # Initialize attachment store as global singleton
-attachment_store = LocalAttachmentStore("uploads")
+attachment_store = S3AttachmentStore()
 
 _chatkit_server: FactAssistantServer | None = create_chatkit_server(attachment_store)
 
@@ -214,17 +243,27 @@ async def direct_upload(file: UploadFile = File(...)) -> dict[str, Any]:
         # Generate attachment ID using the store method
         attachment_id = attachment_store.generate_attachment_id(content_type, None)
         
-        # Save file to disk
-        file_path = attachment_store._get_file_path(attachment_id)
-        with open(file_path, "wb") as f:
-            f.write(content)
+        # Upload file to S3
+        s3_key = attachment_store._get_s3_key(attachment_id)
+        import io
+        file_obj = io.BytesIO(content)
+        upload_result = attachment_store.s3_client.upload_fileobj(
+            file_obj, s3_key, content_type
+        )
+        
+        if not upload_result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"S3 upload failed: {upload_result['error']}"
+            )
         
         # Store metadata
         metadata = {
             "filename": filename,
             "content_type": content_type,
             "size": len(content),
-            "status": "uploaded"
+            "status": "uploaded",
+            "s3_key": s3_key
         }
         attachment_store.metadata_store[attachment_id] = metadata
         print(f"[DEBUG] Stored metadata for {attachment_id}: {metadata}")
@@ -234,8 +273,8 @@ async def direct_upload(file: UploadFile = File(...)) -> dict[str, Any]:
             result = {
                 "id": attachment_id,
                 "type": "image",
-                "url": f"/chatkit/files/{attachment_id}/download",
-                "preview_url": f"/chatkit/files/{attachment_id}/download",
+                "url": upload_result["url"],
+                "preview_url": upload_result["url"],
                 "name": filename,
                 "mime_type": content_type,
                 "size": len(content)
@@ -244,7 +283,7 @@ async def direct_upload(file: UploadFile = File(...)) -> dict[str, Any]:
             result = {
                 "id": attachment_id,
                 "type": "file",
-                "url": f"/chatkit/files/{attachment_id}/download",
+                "url": upload_result["url"],
                 "name": filename,
                 "mime_type": content_type,
                 "size": len(content)
@@ -381,28 +420,36 @@ async def upload_file(attachment_id: str, file: UploadFile = File(...)) -> dict[
 
 @app.get("/chatkit/files/{attachment_id}/download")
 async def download_file(attachment_id: str) -> Response:
-    """Download uploaded file."""
+    """Download uploaded file from S3 using presigned URL for better performance."""
     try:
         if attachment_id not in attachment_store.metadata_store:
             raise HTTPException(status_code=404, detail="Attachment not found")
         
         metadata = attachment_store.metadata_store[attachment_id]
-        file_path = attachment_store._get_file_path(attachment_id)
+        s3_key = metadata.get("s3_key")
         
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
+        if not s3_key:
+            raise HTTPException(status_code=404, detail="S3 key not found for attachment")
         
-        # Read file content
-        with open(file_path, "rb") as f:
-            content = f.read()
+        # Generate presigned URL for direct S3 access (much faster)
+        presigned_result = attachment_store.s3_client.generate_presigned_url(s3_key, expiration=3600)
         
-        return Response(
-            content=content,
-            media_type=metadata["content_type"],
+        if not presigned_result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate presigned URL: {presigned_result['error']}"
+            )
+        
+        # Redirect to presigned URL for direct S3 access
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=presigned_result["url"],
+            status_code=302,
             headers={
                 "Content-Disposition": f"attachment; filename={metadata['filename']}"
             }
         )
+        
     except HTTPException:
         raise
     except Exception as e:

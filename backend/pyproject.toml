@@ -12,6 +12,7 @@ dependencies = [
     "openai-chatkit>=1.0.2,<2",
     "requests>=2.31,<3",
     "supabase",
+    "boto3>=1.40.56",
 ]
 
 [project.optional-dependencies]

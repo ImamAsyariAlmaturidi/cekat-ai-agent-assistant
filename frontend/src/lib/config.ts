@@ -26,27 +26,17 @@ export const STARTER_PROMPTS = [
   {
     label: "Buka Dashboard",
     prompt: "Buka dashboard Cekat",
-    icon: "chart-line",
+    icon: "book-open",
   },
   {
     label: "Setup Chatbot",
     prompt: "Bagaimana cara setup chatbot di Cekat AI?",
-    icon: "robot",
+    icon: "search",
   },
   {
     label: "Integrasi Platform",
     prompt: "Platform apa saja yang bisa diintegrasikan dengan Cekat AI?",
-    icon: "link",
-  },
-  {
-    label: "API Documentation",
-    prompt: "Tunjukkan dokumentasi API Cekat AI",
-    icon: "code",
-  },
-  {
-    label: "Workflow Automation",
-    prompt: "Bagaimana cara membuat workflow automation di Cekat?",
-    icon: "workflow",
+    icon: "sparkle",
   },
 ];
 

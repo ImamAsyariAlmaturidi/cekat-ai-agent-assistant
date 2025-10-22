@@ -66,7 +66,7 @@ class CekatDocsRAG:
                 return []
             
             if not self.supabase:
-                logger.error("Supabase client not available")
+                logger.warning("Supabase client not available - returning empty results")
                 return []
             
             # Generate embedding for query using small model

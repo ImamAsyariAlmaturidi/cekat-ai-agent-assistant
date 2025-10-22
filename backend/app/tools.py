@@ -18,7 +18,7 @@ from .weather import (
     normalize_unit as normalize_temperature_unit,
 )
 from .sample_widget import render_weather_widget, weather_widget_copy_text
-from .cekat_docs_memory import search_cekat_docs
+from .cekat_docs_memory import get_cekat_docs_rag
 
 
 def _gen_id(prefix: str) -> str:
@@ -172,25 +172,51 @@ async def match_cekat_docs_v1(
     ctx: RunContextWrapper[FactAgentContext],
     query: str,
 ) -> dict[str, str | None]:
-    """Mencari dokumen Cekat menggunakan webhook n8n."""
-    # Ambil sessionId dari thread context
+    """Search Cekat documentation using RAG system with Supabase pgvector."""
     session_id = ctx.context.thread.id
-    print("[CekatDocsTool] tool invoked", {"query": query, "session_id": session_id})
+    print("[CekatDocsRAG] tool invoked", {"query": query, "session_id": session_id})
+    
     try:
-        result = search_cekat_docs(query, session_id)
-        print("[CekatDocsTool] search succeeded", {"result_length": len(result)})
+        # Get RAG instance
+        rag = get_cekat_docs_rag()
         
-        return {
-            "query": query,
-            "result": result,
-            "status": "success"
-        }
+        # Search for relevant documents
+        results = rag.search_docs(query, limit=5)
+        
+        if results:
+            # Format results for the AI
+            formatted_results = []
+            for doc in results:
+                formatted_results.append({
+                    "title": doc.get("title", "Untitled"),
+                    "content": doc.get("content", ""),
+                    "url": doc.get("url", ""),
+                    "category": doc.get("category", ""),
+                    "similarity": doc.get("similarity", 0)
+                })
+            
+            print("[CekatDocsRAG] search succeeded", {"result_count": len(formatted_results)})
+            
+            return {
+                "query": query,
+                "results": formatted_results,
+                "status": "success"
+            }
+        else:
+            print("[CekatDocsRAG] no results found")
+            return {
+                "query": query,
+                "results": [],
+                "status": "no_results"
+            }
+            
     except Exception as exc:
-        print("[CekatDocsTool] search failed", {"error": str(exc)})
+        print("[CekatDocsRAG] search failed", {"error": str(exc)})
         return {
             "query": query,
-            "result": f"Error mencari dokumen: {str(exc)}",
-            "status": "error"
+            "results": [],
+            "status": "error",
+            "error": str(exc)
         }
 
 

@@ -80,6 +80,12 @@ documentation/postman → https://documenter.getpostman.com/view/28427156/2sAXqt
 - Always use `match_cekat_docs_v1` for Cekat-related questions.
 - Always use `navigate_to_url` tool for ALL navigation requests.
 
+📚 **Documentation Widget Usage**
+- Use `create_docs_widget_tool` for general documentation, guides, or structured information
+- Use `create_cekat_docs_widget_tool` specifically for Cekat features, APIs, or workflows
+- When explaining complex features or providing step-by-step guides, consider using docs widgets for better presentation
+- Docs widgets provide structured, visually appealing format for information display
+
 💡 **Navigation Examples**
 
 **Example 1: Workflows**

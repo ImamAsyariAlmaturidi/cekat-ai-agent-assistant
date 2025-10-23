@@ -383,5 +383,60 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_e727dabd": {
+    "session_id": "thr_e727dabd",
+    "created_at": "2025-10-23T19:45:29.152874",
+    "last_updated": "2025-10-23T19:45:41.834031",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:45:29.152901",
+        "role": "user",
+        "content": "bantu gua buat bikin workflows dong",
+        "tool_calls": null,
+        "metadata": null
+      },
+      {
+        "timestamp": "2025-10-23T19:45:41.834005",
+        "role": "user",
+        "content": "apa itu workflows",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_2b1cee29": {
+    "session_id": "thr_2b1cee29",
+    "created_at": "2025-10-23T19:47:38.772402",
+    "last_updated": "2025-10-23T19:47:38.772427",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:47:38.772422",
+        "role": "user",
+        "content": "halo",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_2f28065a": {
+    "session_id": "thr_2f28065a",
+    "created_at": "2025-10-23T19:48:07.831857",
+    "last_updated": "2025-10-23T19:48:07.831891",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:48:07.831885",
+        "role": "user",
+        "content": "apa itu cekat",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

@@ -502,5 +502,37 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_588fb16b": {
+    "session_id": "thr_588fb16b",
+    "created_at": "2025-10-23T19:59:26.266311",
+    "last_updated": "2025-10-23T19:59:26.266334",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:59:26.266331",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_dc7b8f0e": {
+    "session_id": "thr_dc7b8f0e",
+    "created_at": "2025-10-23T20:00:40.774073",
+    "last_updated": "2025-10-23T20:00:40.774160",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:00:40.774153",
+        "role": "user",
+        "content": "docs cekat tentang openapi ada ga?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

@@ -29,8 +29,10 @@ from .tools import (
     match_cekat_docs_v1,
     navigate_to_url,
 )
+from .agent_prompt import create_prompt_tool
 from .constants import INSTRUCTIONS, MODEL
 from .memory_store import MemoryStore
+from .session_context import session_manager
 
 
 # If you want to check what's going on under the hood, set this to DEBUG
@@ -60,7 +62,7 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
     def __init__(self, attachment_store=None) -> None:
         self.store: MemoryStore = MemoryStore()
         super().__init__(self.store, attachment_store=attachment_store)
-        tools = [save_fact, switch_theme, get_weather, match_cekat_docs_v1, navigate_to_url]
+        tools = [save_fact, switch_theme, get_weather, match_cekat_docs_v1, navigate_to_url, create_prompt_tool]
         self.assistant = Agent[FactAgentContext](
             model=MODEL,
             name="ChatKit Guide",
@@ -79,6 +81,17 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
         if item:
             print(f"[DEBUG] Item content: {item.content}")
             print(f"[DEBUG] Item attributes: {dir(item)}")
+        
+        # Session context management
+        session_id = thread.id
+        if item:
+            # Extract user message content
+            user_content = _user_message_text(item)
+            session_manager.add_user_message(session_id, user_content)
+            
+            # Get conversation context
+            conversation_context = session_manager.get_session_context(session_id, max_turns=5)
+            print(f"📝 Session Context:\n{conversation_context}")
         
         agent_context = FactAgentContext(
             thread=thread,
@@ -105,14 +118,53 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
         if proper_input is not None:
             agent_input = proper_input
 
+        # Inject session context into agent input
+        if item and session_id in session_manager.sessions:
+            conversation_context = session_manager.get_session_context(session_id, max_turns=5)
+            if conversation_context and "CONVERSATION CONTEXT" in conversation_context:
+                # agent_input is a string, so we can directly prepend context
+                if isinstance(agent_input, str):
+                    original_content = agent_input
+                    agent_input = f"{conversation_context}\n\n{original_content}"
+                    print(f"🔄 Injected session context into AI prompt")
+                else:
+                    print(f"🔍 Unexpected agent_input type: {type(agent_input)}")
+
         result = Runner.run_streamed(
             self.assistant,
             agent_input,
             context=agent_context,
         )
 
+        # Track assistant response
+        assistant_response_parts = []
+        tool_calls_used = []
+        
         async for event in stream_agent_response(agent_context, result):
+            # Track assistant response content
+            if hasattr(event, 'content') and event.content:
+                assistant_response_parts.append(str(event.content))
+            
+            # Track tool calls
+            if hasattr(event, 'tool_call') and event.tool_call:
+                tool_calls_used.append({
+                    'name': getattr(event.tool_call, 'name', 'unknown'),
+                    'arguments': getattr(event.tool_call, 'arguments', {})
+                })
+            
             yield event
+        
+        # Save assistant response to session context
+        if assistant_response_parts and item:
+            assistant_content = " ".join(assistant_response_parts).strip()
+            if assistant_content:
+                session_manager.add_assistant_message(
+                    session_id, 
+                    assistant_content, 
+                    tool_calls=tool_calls_used if tool_calls_used else None
+                )
+                print(f"🤖 Saved assistant response to session {session_id}")
+        
         return
 
     async def action(

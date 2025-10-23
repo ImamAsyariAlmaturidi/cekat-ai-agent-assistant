@@ -573,5 +573,69 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_3b7b22db": {
+    "session_id": "thr_3b7b22db",
+    "created_at": "2025-10-23T20:08:21.770917",
+    "last_updated": "2025-10-23T20:08:21.770943",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:08:21.770939",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_eb542ec4": {
+    "session_id": "thr_eb542ec4",
+    "created_at": "2025-10-23T20:09:24.549527",
+    "last_updated": "2025-10-23T20:09:24.549553",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:09:24.549549",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_794d59fe": {
+    "session_id": "thr_794d59fe",
+    "created_at": "2025-10-23T20:10:03.238092",
+    "last_updated": "2025-10-23T20:10:03.238117",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:10:03.238113",
+        "role": "user",
+        "content": "Open Cekat dashboard",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_5dc10a23": {
+    "session_id": "thr_5dc10a23",
+    "created_at": "2025-10-23T20:10:07.116586",
+    "last_updated": "2025-10-23T20:10:07.116673",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:10:07.116648",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

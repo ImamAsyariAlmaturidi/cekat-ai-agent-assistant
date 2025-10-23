@@ -313,18 +313,15 @@ async def create_cekat_docs_widget_from_results(
         widget = render_docs_widget(widget_data_obj)
         copy_text = docs_widget_copy_text(widget_data_obj)
         
-        # Stream the widget to the client
-        payload: Any
+        # Stream the widget to the client (same as weather widget)
+        print("[CekatDocsWidget] streaming widget")
         try:
-            payload = widget.model_dump()
-        except AttributeError:
-            payload = widget
+            await ctx.context.stream_widget(widget, copy_text=copy_text)
+        except Exception as exc:
+            print("[CekatDocsWidget] widget stream failed", {"error": str(exc)})
+            raise ValueError("Documentation widget failed to stream.") from exc
         
-        await ctx.context.store.add_thread_item(
-            ctx.context.thread.id,
-            payload,
-            ctx.context.request_context
-        )
+        print("[CekatDocsWidget] widget streamed")
         
         print("[CekatDocsWidget] widget created successfully")
         

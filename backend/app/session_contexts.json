@@ -438,5 +438,37 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_af9ec30b": {
+    "session_id": "thr_af9ec30b",
+    "created_at": "2025-10-23T19:49:02.118243",
+    "last_updated": "2025-10-23T19:49:02.118276",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:49:02.118270",
+        "role": "user",
+        "content": "fitur cekat apa aaj",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_1723af43": {
+    "session_id": "thr_1723af43",
+    "created_at": "2025-10-23T19:56:22.925612",
+    "last_updated": "2025-10-23T19:56:22.925634",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:56:22.925630",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

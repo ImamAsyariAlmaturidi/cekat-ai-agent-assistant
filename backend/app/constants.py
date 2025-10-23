@@ -83,6 +83,7 @@ documentation/postman → https://documenter.getpostman.com/view/28427156/2sAXqt
 📚 **Documentation Widget Usage**
 - Use `create_docs_widget_tool` for general documentation, guides, or structured information
 - Use `create_cekat_docs_widget_tool` specifically for Cekat features, APIs, or workflows
+- Use `create_cekat_docs_widget_from_results` AFTER using `match_cekat_docs_v1` to convert search results into a beautiful widget
 - When explaining complex features or providing step-by-step guides, consider using docs widgets for better presentation
 - Docs widgets provide structured, visually appealing format for information display
 

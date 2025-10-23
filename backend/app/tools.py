@@ -227,6 +227,113 @@ async def match_cekat_docs_v1(
 
 
 @function_tool(
+    description_override="Convert Cekat documentation search results into a structured documentation widget. Use this after match_cekat_docs_v1 to display search results in a visually appealing format."
+)
+async def create_cekat_docs_widget_from_results(
+    ctx: RunContextWrapper[FactAgentContext],
+    query: str,
+    results: str,  # JSON string of results
+    status: str = "success"
+) -> dict[str, str | None]:
+    """Convert Cekat docs search results into a documentation widget."""
+    print("[CekatDocsWidget] tool invoked", {"query": query, "status": status})
+    
+    try:
+        import json
+        
+        # Parse results from JSON string
+        try:
+            results_list = json.loads(results) if isinstance(results, str) else results
+        except (json.JSONDecodeError, TypeError):
+            results_list = []
+        
+        if status == "success" and results_list:
+            # Format content for the widget
+            widget_content = f"**Hasil Pencarian untuk: {query}**\n\n"
+            
+            for i, doc in enumerate(results_list[:5], 1):  # Limit to top 5 for readability
+                title = doc.get("title", "Untitled")
+                content = doc.get("content", "")
+                url = doc.get("url", "")
+                category = doc.get("category", "")
+                similarity = doc.get("similarity", 0)
+                
+                # Truncate content if too long
+                if len(content) > 300:
+                    content = content[:300] + "..."
+                
+                widget_content += f"**{i}. {title}**\n"
+                if category:
+                    widget_content += f"*Kategori: {category}*\n"
+                widget_content += f"{content}\n"
+                if url:
+                    widget_content += f"*URL: {url}*\n"
+                widget_content += f"*Relevansi: {similarity:.2f}*\n\n"
+            
+            # Create docs widget with the results
+            widget_data = create_cekat_docs_widget(
+                title=f"Dokumentasi Cekat: {query}",
+                content=widget_content,
+                feature_type="Documentation",
+                url_link="https://chat.cekat.ai/docs"
+            )
+            
+        elif status == "no_results":
+            # Create widget for no results
+            widget_content = f"**Tidak ada hasil ditemukan untuk: {query}**\n\n"
+            widget_content += "Silakan coba dengan kata kunci yang berbeda atau lebih spesifik."
+            
+            widget_data = create_cekat_docs_widget(
+                title=f"Dokumentasi Cekat: {query}",
+                content=widget_content,
+                feature_type="Documentation",
+                url_link="https://chat.cekat.ai/docs"
+            )
+            
+        else:  # error case
+            # Create error widget
+            error_msg = "Unknown error"
+            if results_list and isinstance(results_list, list) and len(results_list) > 0:
+                error_msg = results_list[0].get("error", "Unknown error")
+            
+            widget_content = f"**Error saat mencari dokumentasi untuk: {query}**\n\n"
+            widget_content += f"Terjadi kesalahan: {error_msg}\n\n"
+            widget_content += "Silakan coba lagi atau hubungi support."
+            
+            widget_data = create_cekat_docs_widget(
+                title=f"Dokumentasi Cekat: {query}",
+                content=widget_content,
+                feature_type="Documentation",
+                url_link="https://chat.cekat.ai/docs"
+            )
+        
+        # Stream the widget to the client
+        await ctx.context.store.add_thread_item(
+            ctx.context.thread.id,
+            widget_data,
+            ctx.context.request_context
+        )
+        
+        print("[CekatDocsWidget] widget created successfully")
+        
+        return {
+            "query": query,
+            "results_count": len(results_list) if results_list else 0,
+            "status": status,
+            "widget_created": "true"
+        }
+        
+    except Exception as exc:
+        print("[CekatDocsWidget] error creating widget", {"error": str(exc)})
+        return {
+            "query": query,
+            "status": "error",
+            "error": str(exc),
+            "widget_created": "false"
+        }
+
+
+@function_tool(
     description_override="Directly navigate to a URL by opening it in a new browser tab. Use this ONLY for direct navigation without creating any widget or button. For creating clickable buttons, use create_url_widget instead."
 )
 async def navigate_to_url(
@@ -417,6 +524,7 @@ __all__ = [
     "switch_theme", 
     "get_weather",
     "match_cekat_docs_v1",
+    "create_cekat_docs_widget_from_results",
     "navigate_to_url",
     "create_docs_widget_tool",
     "create_cekat_docs_widget_tool",

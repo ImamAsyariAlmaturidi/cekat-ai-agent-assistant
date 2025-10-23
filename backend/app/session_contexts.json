@@ -948,5 +948,21 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_ab8b4b65": {
+    "session_id": "thr_ab8b4b65",
+    "created_at": "2025-10-23T20:37:02.829879",
+    "last_updated": "2025-10-23T20:37:02.829905",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:37:02.829902",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

@@ -444,15 +444,19 @@ async def navigate_to_url(
         widget = render_nav_button_widget(nav_data)
         copy_text = nav_button_copy_text(nav_data)
         
-        # Stream the widget to the client LAST (so it appears at the end)
-        print("[NavigateTool] streaming navigation button widget")
+        # Delay widget streaming to appear after text completion
+        import asyncio
+        await asyncio.sleep(2)  # Wait 2 seconds for text to complete
+        
+        # Stream the widget to the client AFTER delay
+        print("[NavigateTool] streaming navigation button widget after delay")
         try:
             await ctx.context.stream_widget(widget, copy_text=copy_text)
         except Exception as exc:
             print("[NavigateTool] widget stream failed", {"error": str(exc)})
             raise ValueError("Navigation button widget failed to stream.") from exc
         
-        print("[NavigateTool] navigation button widget streamed")
+        print("[NavigateTool] navigation button widget streamed after delay")
         
         return {
             "url": url,

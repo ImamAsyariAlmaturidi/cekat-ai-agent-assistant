@@ -868,5 +868,37 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_dfae1597": {
+    "session_id": "thr_dfae1597",
+    "created_at": "2025-10-23T20:32:16.392925",
+    "last_updated": "2025-10-23T20:32:16.392949",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:32:16.392945",
+        "role": "user",
+        "content": "What is Cekat AI and its features?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_78184370": {
+    "session_id": "thr_78184370",
+    "created_at": "2025-10-23T20:32:34.626491",
+    "last_updated": "2025-10-23T20:32:34.626517",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:32:34.626513",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

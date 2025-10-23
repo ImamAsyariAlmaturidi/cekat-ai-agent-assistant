@@ -443,6 +443,17 @@ async def navigate_to_url(
         
         print("[NavigateTool] navigation button widget streamed")
         
+        # Set ClientToolCall to trigger navigation in frontend
+        ctx.context.client_tool_call = ClientToolCall(
+            name="navigate_to_url",
+            arguments={
+                "url": url,
+                "open_in_new_tab": True,
+                "description": description or f"Navigasi ke {title}"
+            },
+        )
+        print("[NavigateTool] ClientToolCall set for navigation")
+        
         return {
             "url": url,
             "title": title,

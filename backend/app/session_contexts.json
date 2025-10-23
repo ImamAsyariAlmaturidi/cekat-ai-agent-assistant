@@ -502,5 +502,76 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_588fb16b": {
+    "session_id": "thr_588fb16b",
+    "created_at": "2025-10-23T19:59:26.266311",
+    "last_updated": "2025-10-23T19:59:26.266334",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:59:26.266331",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_dc7b8f0e": {
+    "session_id": "thr_dc7b8f0e",
+    "created_at": "2025-10-23T20:00:40.774073",
+    "last_updated": "2025-10-23T20:00:40.774160",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:00:40.774153",
+        "role": "user",
+        "content": "docs cekat tentang openapi ada ga?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_44219ada": {
+    "session_id": "thr_44219ada",
+    "created_at": "2025-10-23T20:02:38.489111",
+    "last_updated": "2025-10-23T20:02:38.489138",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:02:38.489134",
+        "role": "user",
+        "content": "cara bikin workflwos gimana? coba pake widget",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_aff0223a": {
+    "session_id": "thr_aff0223a",
+    "created_at": "2025-10-23T20:03:45.543348",
+    "last_updated": "2025-10-23T20:04:15.439242",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:03:45.543389",
+        "role": "user",
+        "content": "Open Cekat dashboard",
+        "tool_calls": null,
+        "metadata": null
+      },
+      {
+        "timestamp": "2025-10-23T20:04:15.439216",
+        "role": "user",
+        "content": "weather di tangerang gimana",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

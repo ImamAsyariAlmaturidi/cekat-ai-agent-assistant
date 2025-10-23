@@ -796,21 +796,24 @@ def url_widget_copy_text(data: UrlWidgetData) -> str:
     return f"{data.label}: {data.url}"
 
 
-# Docs Widget Components
+# Removed docs widget components
+
+
+# Navigation Button Widget Components
 @dataclass(frozen=True)
-class DocsWidgetData:
-    """Data structure for documentation widget."""
+class NavButtonData:
+    """Data structure for navigation button widget."""
     title: str
-    content: str
-    url_link: str | None = None
-    hint: str = "Documentation"
-    feature_type: str | None = None
+    description: str
+    url: str
+    button_text: str = "Buka Halaman"
+    icon: str = "🔗"
 
 
-def render_docs_widget(data: DocsWidgetData) -> Card:
-    """Build a beautiful documentation widget."""
+def render_nav_button_widget(data: NavButtonData) -> Card:
+    """Build a navigation button widget."""
     
-    # Create header with icon and hint
+    # Create header with icon and title
     header_row = Row(
         justify="between",
         align="center",
@@ -819,8 +822,8 @@ def render_docs_widget(data: DocsWidgetData) -> Card:
                 align="center",
                 gap=2,
                 children=[
-                    Text(value="📚", size="lg"),
-                    Text(value=data.hint, size="md", color="tertiary", weight="medium")
+                    Text(value=data.icon, size="lg"),
+                    Text(value="Navigasi", size="md", color="tertiary", weight="medium")
                 ]
             ),
             Text(value="Cekat AI", size="sm", color="tertiary", weight="medium")
@@ -837,48 +840,54 @@ def render_docs_widget(data: DocsWidgetData) -> Card:
     # Create title section
     title_section = Title(
         value=data.title, 
-        size="xl", 
+        size="lg", 
         weight="bold",
         color="primary"
     )
     
-    # Create content section with better formatting
-    content_section = Col(
-        align="start",
-        gap=3,
+    # Create description section
+    description_section = Text(
+        value=data.description, 
+        size="md", 
+        color="text"
+    )
+    
+    # Create button section
+    button_section = Row(
+        justify="center",
         children=[
-            Text(value=data.content, size="md", color="text")
+            Button(
+                text=data.button_text,
+                variant="solid",
+                size="md",
+                action=ActionConfig(
+                    type="navigate",
+                    url=data.url
+                )
+            )
         ]
     )
     
-    # Create footer with URL if available
-    footer_children = []
-    if data.url_link:
-        footer_children.append(
-            Row(
-                justify="end",
-                children=[
-                    Text(value="📖 Baca lebih lanjut", size="sm", color="primary", weight="medium")
-                ]
-            )
-        )
-    
     # Combine all sections
-    all_children = [header_row, divider, title_section, content_section]
-    if footer_children:
-        all_children.extend(footer_children)
+    all_children = [
+        header_row, 
+        divider, 
+        title_section, 
+        description_section,
+        button_section
+    ]
     
     return Card(
-        key="docs_widget",
+        key="nav_button_widget",
         padding=6,
         background="surface",
         children=all_children
     )
 
 
-def docs_widget_copy_text(data: DocsWidgetData) -> str:
-    """Generate copy text for docs widget."""
-    return f"{data.title}\n\n{data.content}"
+def nav_button_copy_text(data: NavButtonData) -> str:
+    """Generate copy text for nav button widget."""
+    return f"{data.title}\n\n{data.description}\n\nURL: {data.url}"
 
 
 def _compact(items: Sequence[WidgetComponent | None]) -> list[WidgetComponent]:

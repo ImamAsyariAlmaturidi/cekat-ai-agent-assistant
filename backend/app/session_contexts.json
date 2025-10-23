@@ -733,5 +733,53 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_94431c3d": {
+    "session_id": "thr_94431c3d",
+    "created_at": "2025-10-23T20:16:44.429747",
+    "last_updated": "2025-10-23T20:16:44.429769",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:16:44.429765",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_d341ee44": {
+    "session_id": "thr_d341ee44",
+    "created_at": "2025-10-23T20:20:53.703135",
+    "last_updated": "2025-10-23T20:20:53.703160",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:20:53.703156",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_778cc8cf": {
+    "session_id": "thr_778cc8cf",
+    "created_at": "2025-10-23T20:21:53.033109",
+    "last_updated": "2025-10-23T20:21:53.033131",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:21:53.033127",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

@@ -17,12 +17,8 @@ from .weather import (
     retrieve_weather,
     normalize_unit as normalize_temperature_unit,
 )
-from .sample_widget import render_weather_widget, weather_widget_copy_text
-from .sample_widget import (
-    render_docs_widget,
-    docs_widget_copy_text,
-    DocsWidgetData
-)
+from .sample_widget import render_weather_widget, weather_widget_copy_text, render_nav_button_widget, nav_button_copy_text, NavButtonData
+# Removed docs widget imports
 from .cekat_docs_memory import get_cekat_docs_rag
 
 
@@ -348,15 +344,18 @@ async def create_cekat_docs_widget_from_results(
 
 
 @function_tool(
-    description_override="Directly navigate to a URL by opening it in a new browser tab. Use this ONLY for direct navigation without creating any widget or button. For creating clickable buttons, use create_url_widget instead."
+    description_override="Create a navigation button widget for URLs. This creates a beautiful button that users can click to navigate to a page, instead of directly opening a new tab."
 )
 async def navigate_to_url(
     ctx: RunContextWrapper[FactAgentContext],
     url: str,
+    title: str = "",
     description: str = "",
+    button_text: str = "Buka Halaman",
+    icon: str = "🔗"
 ) -> dict[str, str | None]:
-    """Navigasi ke URL atau buka tab baru dengan hardcoded Cekat URLs."""
-    print("[NavigateTool] tool invoked", {"url": url, "force_new_tab": True})
+    """Create a navigation button widget for URLs."""
+    print("[NavigateTool] creating navigation button widget", {"url": url, "title": title})
     
     # Hardcoded Cekat URLs mapping
     cekat_urls = {
@@ -411,27 +410,53 @@ async def navigate_to_url(
     if not url.startswith(("http://", "https://")):
         url = f"https://{url}"
     
+    # Generate title and description if not provided
+    if not title:
+        # Extract page name from URL
+        page_name = url.split('/')[-1] or url.split('/')[-2]
+        title = f"Buka {page_name.replace('-', ' ').title()}"
+    
+    if not description:
+        description = f"Klik tombol di bawah untuk membuka halaman {title.lower()}"
+    
     try:
-        ctx.context.client_tool_call = ClientToolCall(
-            name="navigate_to_url",
-            arguments={
-                "url": url,
-                "open_in_new_tab": True,
-                "description": description or f"Navigasi ke {url}"
-            },
+        # Create navigation button widget data
+        nav_data = NavButtonData(
+            title=title,
+            description=description,
+            url=url,
+            button_text=button_text,
+            icon=icon
         )
+        
+        # Render the widget
+        widget = render_nav_button_widget(nav_data)
+        copy_text = nav_button_copy_text(nav_data)
+        
+        # Stream the widget to the client
+        print("[NavigateTool] streaming navigation button widget")
+        try:
+            await ctx.context.stream_widget(widget, copy_text=copy_text)
+        except Exception as exc:
+            print("[NavigateTool] widget stream failed", {"error": str(exc)})
+            raise ValueError("Navigation button widget failed to stream.") from exc
+        
+        print("[NavigateTool] navigation button widget streamed")
         
         return {
             "url": url,
+            "title": title,
             "description": description,
-            "status": "success"
+            "status": "success",
+            "widget_created": "true"
         }
     except Exception as exc:
-        print("[NavigateTool] navigation failed", {"error": str(exc)})
+        print("[NavigateTool] navigation button creation failed", {"error": str(exc)})
         return {
             "url": url,
             "status": "error",
-            "error": str(exc)
+            "error": str(exc),
+            "widget_created": "false"
         }
 
 
@@ -443,7 +468,7 @@ __all__ = [
     "switch_theme", 
     "get_weather",
     "match_cekat_docs_v1",
-    "create_cekat_docs_widget_from_results",
     "navigate_to_url",
+    "create_prompt_tool",
     "FactAgentContext",
 ]

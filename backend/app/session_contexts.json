@@ -470,5 +470,37 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_88d1adf1": {
+    "session_id": "thr_88d1adf1",
+    "created_at": "2025-10-23T19:56:49.346181",
+    "last_updated": "2025-10-23T19:56:49.346204",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:56:49.346200",
+        "role": "user",
+        "content": "agents.exceptions.UserError: additionalProperties should not be set for object types. This could be because you're using an older version of Pydantic, or because you configured additional properties to be allowed. If you really need this, update the function or output tool to not use a strict schema.",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_9fff7534": {
+    "session_id": "thr_9fff7534",
+    "created_at": "2025-10-23T19:56:58.618240",
+    "last_updated": "2025-10-23T19:56:58.618303",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T19:56:58.618288",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

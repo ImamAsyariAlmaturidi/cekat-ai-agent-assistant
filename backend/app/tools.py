@@ -18,11 +18,10 @@ from .weather import (
     normalize_unit as normalize_temperature_unit,
 )
 from .sample_widget import render_weather_widget, weather_widget_copy_text
-from .docs_widget import (
-    create_docs_widget,
-    create_cekat_docs_widget,
-    create_workflow_docs_widget,
-    create_api_docs_widget
+from .sample_widget import (
+    render_docs_widget,
+    docs_widget_copy_text,
+    DocsWidgetData
 )
 from .cekat_docs_memory import get_cekat_docs_rag
 
@@ -270,12 +269,13 @@ async def create_cekat_docs_widget_from_results(
                     widget_content += f"*URL: {url}*\n"
                 widget_content += f"*Relevansi: {similarity:.2f}*\n\n"
             
-            # Create docs widget with the results
-            widget_data = create_cekat_docs_widget(
+            # Create widget data
+            widget_data_obj = DocsWidgetData(
                 title=f"Dokumentasi Cekat: {query}",
                 content=widget_content,
-                feature_type="Documentation",
-                url_link="https://chat.cekat.ai/docs"
+                url_link="https://chat.cekat.ai/docs",
+                hint="Cekat Documentation",
+                feature_type="Documentation"
             )
             
         elif status == "no_results":
@@ -283,11 +283,12 @@ async def create_cekat_docs_widget_from_results(
             widget_content = f"**Tidak ada hasil ditemukan untuk: {query}**\n\n"
             widget_content += "Silakan coba dengan kata kunci yang berbeda atau lebih spesifik."
             
-            widget_data = create_cekat_docs_widget(
+            widget_data_obj = DocsWidgetData(
                 title=f"Dokumentasi Cekat: {query}",
                 content=widget_content,
-                feature_type="Documentation",
-                url_link="https://chat.cekat.ai/docs"
+                url_link="https://chat.cekat.ai/docs",
+                hint="Cekat Documentation",
+                feature_type="Documentation"
             )
             
         else:  # error case
@@ -300,17 +301,28 @@ async def create_cekat_docs_widget_from_results(
             widget_content += f"Terjadi kesalahan: {error_msg}\n\n"
             widget_content += "Silakan coba lagi atau hubungi support."
             
-            widget_data = create_cekat_docs_widget(
+            widget_data_obj = DocsWidgetData(
                 title=f"Dokumentasi Cekat: {query}",
                 content=widget_content,
-                feature_type="Documentation",
-                url_link="https://chat.cekat.ai/docs"
+                url_link="https://chat.cekat.ai/docs",
+                hint="Cekat Documentation",
+                feature_type="Documentation"
             )
         
+        # Render the widget
+        widget = render_docs_widget(widget_data_obj)
+        copy_text = docs_widget_copy_text(widget_data_obj)
+        
         # Stream the widget to the client
+        payload: Any
+        try:
+            payload = widget.model_dump()
+        except AttributeError:
+            payload = widget
+        
         await ctx.context.store.add_thread_item(
             ctx.context.thread.id,
-            widget_data,
+            payload,
             ctx.context.request_context
         )
         
@@ -421,101 +433,6 @@ async def navigate_to_url(
         }
 
 
-@function_tool(description_override="Create a documentation widget to display structured information with title, content, and optional links. Use this when you need to present documentation, guides, or structured information in a visually appealing format.")
-async def create_docs_widget_tool(
-    ctx: RunContextWrapper[FactAgentContext],
-    title: str,
-    content: str,
-    url_link: str = "",
-    hint: str = "Documentation",
-    size: str = "md"
-) -> dict[str, str | None]:
-    """Create a documentation widget with structured information."""
-    print("[DocsWidgetTool] tool invoked", {"title": title, "size": size})
-    
-    try:
-        # Create the widget data
-        widget_data = create_docs_widget(
-            title=title,
-            content=content,
-            url_link=url_link if url_link else None,
-            hint=hint,
-            size=size
-        )
-        
-        # Stream the widget to the client
-        await ctx.context.store.add_thread_item(
-            ctx.context.thread.id,
-            widget_data,
-            ctx.context.request_context
-        )
-        
-        print("[DocsWidgetTool] widget created successfully")
-        
-        return {
-            "title": title,
-            "content": content,
-            "url_link": url_link,
-            "hint": hint,
-            "size": size,
-            "status": "success"
-        }
-        
-    except Exception as exc:
-        print("[DocsWidgetTool] error creating widget", {"error": str(exc)})
-        return {
-            "title": title,
-            "content": content,
-            "status": "error",
-            "error": str(exc)
-        }
-
-
-@function_tool(description_override="Create a Cekat-specific documentation widget for features, APIs, or workflows. Use this when explaining Cekat features, APIs, or workflows to provide structured documentation.")
-async def create_cekat_docs_widget_tool(
-    ctx: RunContextWrapper[FactAgentContext],
-    title: str,
-    content: str,
-    feature_type: str = "Feature",
-    url_link: str = ""
-) -> dict[str, str | None]:
-    """Create a Cekat-specific documentation widget."""
-    print("[CekatDocsWidgetTool] tool invoked", {"title": title, "feature_type": feature_type})
-    
-    try:
-        # Create the Cekat widget data
-        widget_data = create_cekat_docs_widget(
-            title=title,
-            content=content,
-            feature_type=feature_type,
-            url_link=url_link if url_link else None
-        )
-        
-        # Stream the widget to the client
-        await ctx.context.store.add_thread_item(
-            ctx.context.thread.id,
-            widget_data,
-            ctx.context.request_context
-        )
-        
-        print("[CekatDocsWidgetTool] widget created successfully")
-        
-        return {
-            "title": title,
-            "content": content,
-            "feature_type": feature_type,
-            "url_link": url_link,
-            "status": "success"
-        }
-        
-    except Exception as exc:
-        print("[CekatDocsWidgetTool] error creating widget", {"error": str(exc)})
-        return {
-            "title": title,
-            "content": content,
-            "status": "error",
-            "error": str(exc)
-        }
 
 
 # Export all tools for easy importing
@@ -526,7 +443,5 @@ __all__ = [
     "match_cekat_docs_v1",
     "create_cekat_docs_widget_from_results",
     "navigate_to_url",
-    "create_docs_widget_tool",
-    "create_cekat_docs_widget_tool",
     "FactAgentContext",
 ]

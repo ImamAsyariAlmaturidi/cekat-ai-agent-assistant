@@ -796,5 +796,71 @@ def url_widget_copy_text(data: UrlWidgetData) -> str:
     return f"{data.label}: {data.url}"
 
 
+# Docs Widget Components
+@dataclass(frozen=True)
+class DocsWidgetData:
+    """Data structure for documentation widget."""
+    title: str
+    content: str
+    url_link: str | None = None
+    hint: str = "Documentation"
+    feature_type: str | None = None
+
+
+def render_docs_widget(data: DocsWidgetData) -> Card:
+    """Build a documentation widget."""
+    
+    # Create header with hint and optional URL
+    header_children = []
+    
+    if data.url_link:
+        header_children.append(
+            Row(
+                justify="between",
+                align="center",
+                children=[
+                    Text(value=data.hint, size="md", color="tertiary"),
+                    Text(value=data.url_link, color="tertiary", size="sm")
+                ]
+            )
+        )
+    else:
+        header_children.append(
+            Text(value=data.hint, size="md", color="tertiary")
+        )
+    
+    # Add divider
+    header_children.append(
+        Box(
+            height=1,
+            background="border",
+            margin={"top": 2, "bottom": 2}
+        )
+    )
+    
+    # Create content section
+    content_section = Col(
+        align="start",
+        gap=4,
+        children=[
+            Title(value=data.title, size="lg", weight="semibold"),
+            Text(value=data.content, size="sm")
+        ]
+    )
+    
+    header_children.append(content_section)
+    
+    return Card(
+        key="docs_widget",
+        padding=4,
+        children=header_children
+    )
+
+
+def docs_widget_copy_text(data: DocsWidgetData) -> str:
+    """Generate copy text for docs widget."""
+    return f"{data.title}\n\n{data.content}"
+
+
 def _compact(items: Sequence[WidgetComponent | None]) -> list[WidgetComponent]:
     return [item for item in items if item is not None]

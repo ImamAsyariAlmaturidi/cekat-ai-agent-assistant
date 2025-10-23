@@ -29,8 +29,6 @@ from .tools import (
     match_cekat_docs_v1,
     create_cekat_docs_widget_from_results,
     navigate_to_url,
-    create_docs_widget_tool,
-    create_cekat_docs_widget_tool,
 )
 from .agent_prompt import create_prompt_tool
 from .constants import INSTRUCTIONS, MODEL
@@ -65,7 +63,7 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
     def __init__(self, attachment_store=None) -> None:
         self.store: MemoryStore = MemoryStore()
         super().__init__(self.store, attachment_store=attachment_store)
-        tools = [save_fact, switch_theme, get_weather, match_cekat_docs_v1, create_cekat_docs_widget_from_results, navigate_to_url, create_prompt_tool, create_docs_widget_tool, create_cekat_docs_widget_tool]
+        tools = [save_fact, switch_theme, get_weather, match_cekat_docs_v1, create_cekat_docs_widget_from_results, navigate_to_url, create_prompt_tool]
         self.assistant = Agent[FactAgentContext](
             model=MODEL,
             name="ChatKit Guide",

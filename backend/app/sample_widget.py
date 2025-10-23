@@ -811,77 +811,34 @@ class NavButtonData:
 
 
 def render_nav_button_widget(data: NavButtonData) -> Card:
-    """Build a navigation button widget."""
-    
-    # Create header with icon and title
-    header_row = Row(
-        justify="between",
-        align="center",
-        children=[
-            Row(
-                align="center",
-                gap=2,
-                children=[
-                    Text(value=data.icon, size="lg"),
-                    Text(value="Navigasi", size="md", color="tertiary", weight="medium")
-                ]
-            ),
-            Text(value="Cekat AI", size="sm", color="tertiary", weight="medium")
-        ]
-    )
-    
-    # Add divider
-    divider = Box(
-        height=1,
-        background="border",
-        margin={"top": 3, "bottom": 3}
-    )
-    
-    # Create title section
-    title_section = Title(
-        value=data.title, 
-        size="lg", 
-        weight="bold",
-        color="primary"
-    )
-    
-    # Create description section
-    description_section = Text(
-        value=data.description, 
-        size="md", 
-        color="text"
-    )
-    
-    # Create button section
-    button_section = Row(
-        justify="center",
-        children=[
-            Button(
-                text=data.button_text,
-                variant="solid",
-                size="md",
-                action=ActionConfig(
-                    type="navigate",
-                    url=data.url
-                )
-            )
-        ]
-    )
-    
-    # Combine all sections
-    all_children = [
-        header_row, 
-        divider, 
-        title_section, 
-        description_section,
-        button_section
-    ]
+    """Build a simple navigation button widget."""
     
     return Card(
         key="nav_button_widget",
-        padding=6,
-        background="surface",
-        children=all_children
+        size="sm",
+        children=[
+            Col(
+                align="center",
+                gap=3,
+                padding=1,
+                children=[
+                    Title(
+                        textAlign="center",
+                        value=data.title,
+                        size="sm"
+                    ),
+                    Button(
+                        label=data.button_text,
+                        style="primary",
+                        iconEnd="external-link",
+                        onClickAction={
+                            "type": "navigate",
+                            "payload": {"url": data.url}
+                        }
+                    )
+                ]
+            )
+        ]
     )
 
 

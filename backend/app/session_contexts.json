@@ -781,5 +781,21 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_b2d14420": {
+    "session_id": "thr_b2d14420",
+    "created_at": "2025-10-23T20:22:15.518087",
+    "last_updated": "2025-10-23T20:22:15.518109",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:22:15.518105",
+        "role": "user",
+        "content": "cara bikin workflows di cekat gimana",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

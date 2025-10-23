@@ -808,52 +808,71 @@ class DocsWidgetData:
 
 
 def render_docs_widget(data: DocsWidgetData) -> Card:
-    """Build a documentation widget."""
+    """Build a beautiful documentation widget."""
     
-    # Create header with hint and optional URL
-    header_children = []
-    
-    if data.url_link:
-        header_children.append(
-            Row(
-                justify="between",
-                align="center",
-                children=[
-                    Text(value=data.hint, size="md", color="tertiary"),
-                    Text(value=data.url_link, color="tertiary", size="sm")
-                ]
-            )
-        )
-    else:
-        header_children.append(
-            Text(value=data.hint, size="md", color="tertiary")
-        )
-    
-    # Add divider
-    header_children.append(
-        Box(
-            height=1,
-            background="border",
-            margin={"top": 2, "bottom": 2}
-        )
-    )
-    
-    # Create content section
-    content_section = Col(
-        align="start",
-        gap=4,
+    # Create header with icon and hint
+    header_row = Row(
+        justify="between",
+        align="center",
         children=[
-            Title(value=data.title, size="lg", weight="semibold"),
-            Text(value=data.content, size="sm")
+            Row(
+                align="center",
+                gap=2,
+                children=[
+                    Text(value="📚", size="lg"),
+                    Text(value=data.hint, size="md", color="tertiary", weight="medium")
+                ]
+            ),
+            Text(value="Cekat AI", size="sm", color="tertiary", weight="medium")
         ]
     )
     
-    header_children.append(content_section)
+    # Add divider
+    divider = Box(
+        height=1,
+        background="border",
+        margin={"top": 3, "bottom": 3}
+    )
+    
+    # Create title section
+    title_section = Title(
+        value=data.title, 
+        size="xl", 
+        weight="bold",
+        color="primary"
+    )
+    
+    # Create content section with better formatting
+    content_section = Col(
+        align="start",
+        gap=3,
+        children=[
+            Text(value=data.content, size="md", color="text")
+        ]
+    )
+    
+    # Create footer with URL if available
+    footer_children = []
+    if data.url_link:
+        footer_children.append(
+            Row(
+                justify="end",
+                children=[
+                    Text(value="📖 Baca lebih lanjut", size="sm", color="primary", weight="medium")
+                ]
+            )
+        )
+    
+    # Combine all sections
+    all_children = [header_row, divider, title_section, content_section]
+    if footer_children:
+        all_children.extend(footer_children)
     
     return Card(
         key="docs_widget",
-        padding=4,
-        children=header_children
+        padding=6,
+        background="surface",
+        children=all_children
     )
 
 

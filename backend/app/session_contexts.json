@@ -653,5 +653,85 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_3e0a5402": {
+    "session_id": "thr_3e0a5402",
+    "created_at": "2025-10-23T20:13:26.183793",
+    "last_updated": "2025-10-23T20:13:26.183818",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:13:26.183814",
+        "role": "user",
+        "content": "Open Cekat dashboard",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_81689c50": {
+    "session_id": "thr_81689c50",
+    "created_at": "2025-10-23T20:13:28.458874",
+    "last_updated": "2025-10-23T20:13:28.458928",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:13:28.458916",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_3b52b2ee": {
+    "session_id": "thr_3b52b2ee",
+    "created_at": "2025-10-23T20:13:56.422661",
+    "last_updated": "2025-10-23T20:13:56.422713",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:13:56.422697",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_88562521": {
+    "session_id": "thr_88562521",
+    "created_at": "2025-10-23T20:15:23.618229",
+    "last_updated": "2025-10-23T20:15:23.618253",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:15:23.618249",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_518a10f8": {
+    "session_id": "thr_518a10f8",
+    "created_at": "2025-10-23T20:15:54.917863",
+    "last_updated": "2025-10-23T20:15:54.917883",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:15:54.917879",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

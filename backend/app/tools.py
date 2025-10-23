@@ -17,7 +17,7 @@ from .weather import (
     retrieve_weather,
     normalize_unit as normalize_temperature_unit,
 )
-from .sample_widget import render_weather_widget, weather_widget_copy_text, render_nav_button_widget, nav_button_copy_text, NavButtonData
+from .sample_widget import render_weather_widget, weather_widget_copy_text
 # Removed docs widget imports
 from .cekat_docs_memory import get_cekat_docs_rag
 
@@ -344,18 +344,16 @@ async def create_cekat_docs_widget_from_results(
 
 
 @function_tool(
-    description_override="Create a navigation button widget for URLs. This creates a beautiful button that users can click to navigate to a page, instead of directly opening a new tab."
+    description_override="Create a clickable link in text for URLs. This creates a simple link that users can click to navigate to a page."
 )
 async def navigate_to_url(
     ctx: RunContextWrapper[FactAgentContext],
     url: str,
-    title: str = "",
-    description: str = "",
-    button_text: str = "Buka Halaman",
-    icon: str = "🔗"
+    link_text: str = "",
+    description: str = ""
 ) -> dict[str, str | None]:
-    """Create a navigation button widget for URLs."""
-    print("[NavigateTool] creating navigation button widget", {"url": url, "title": title})
+    """Create a clickable link in text for URLs."""
+    print("[NavigateTool] creating clickable link", {"url": url, "link_text": link_text})
     
     # Hardcoded Cekat URLs mapping
     cekat_urls = {
@@ -410,68 +408,36 @@ async def navigate_to_url(
     if not url.startswith(("http://", "https://")):
         url = f"https://{url}"
     
-    # Generate title and description if not provided
-    if not title:
+    # Generate link text if not provided
+    if not link_text:
         # Extract page name from URL
         page_name = url.split('/')[-1] or url.split('/')[-2]
-        title = f"Buka {page_name.replace('-', ' ').title()}"
-    
-    if not description:
-        description = f"Klik tombol di bawah untuk membuka halaman {title.lower()}"
+        link_text = f"Buka {page_name.replace('-', ' ').title()}"
     
     try:
-        # Set ClientToolCall to trigger navigation in frontend FIRST
+        # Set ClientToolCall to trigger navigation in frontend
         ctx.context.client_tool_call = ClientToolCall(
             name="navigate_to_url",
             arguments={
                 "url": url,
                 "open_in_new_tab": True,
-                "description": description or f"Navigasi ke {title}"
+                "description": description or f"Navigasi ke {link_text}"
             },
         )
         print("[NavigateTool] ClientToolCall set for navigation")
         
-        # Create navigation button widget data
-        nav_data = NavButtonData(
-            title=title,
-            description=description,
-            url=url,
-            button_text=button_text,
-            icon=icon
-        )
-        
-        # Render the widget
-        widget = render_nav_button_widget(nav_data)
-        copy_text = nav_button_copy_text(nav_data)
-        
-        # Delay widget streaming to appear after text completion
-        import asyncio
-        await asyncio.sleep(2)  # Wait 2 seconds for text to complete
-        
-        # Stream the widget to the client AFTER delay
-        print("[NavigateTool] streaming navigation button widget after delay")
-        try:
-            await ctx.context.stream_widget(widget, copy_text=copy_text)
-        except Exception as exc:
-            print("[NavigateTool] widget stream failed", {"error": str(exc)})
-            raise ValueError("Navigation button widget failed to stream.") from exc
-        
-        print("[NavigateTool] navigation button widget streamed after delay")
-        
         return {
             "url": url,
-            "title": title,
+            "link_text": link_text,
             "description": description,
-            "status": "success",
-            "widget_created": "true"
+            "status": "success"
         }
     except Exception as exc:
-        print("[NavigateTool] navigation button creation failed", {"error": str(exc)})
+        print("[NavigateTool] navigation failed", {"error": str(exc)})
         return {
             "url": url,
             "status": "error",
-            "error": str(exc),
-            "widget_created": "false"
+            "error": str(exc)
         }
 
 

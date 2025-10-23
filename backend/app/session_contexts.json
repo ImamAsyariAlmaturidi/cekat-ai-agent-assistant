@@ -637,5 +637,21 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_7396c4ed": {
+    "session_id": "thr_7396c4ed",
+    "created_at": "2025-10-23T20:10:21.351565",
+    "last_updated": "2025-10-23T20:10:21.351598",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:10:21.351592",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

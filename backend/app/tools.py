@@ -420,6 +420,17 @@ async def navigate_to_url(
         description = f"Klik tombol di bawah untuk membuka halaman {title.lower()}"
     
     try:
+        # Set ClientToolCall to trigger navigation in frontend FIRST
+        ctx.context.client_tool_call = ClientToolCall(
+            name="navigate_to_url",
+            arguments={
+                "url": url,
+                "open_in_new_tab": True,
+                "description": description or f"Navigasi ke {title}"
+            },
+        )
+        print("[NavigateTool] ClientToolCall set for navigation")
+        
         # Create navigation button widget data
         nav_data = NavButtonData(
             title=title,
@@ -433,7 +444,7 @@ async def navigate_to_url(
         widget = render_nav_button_widget(nav_data)
         copy_text = nav_button_copy_text(nav_data)
         
-        # Stream the widget to the client
+        # Stream the widget to the client LAST (so it appears at the end)
         print("[NavigateTool] streaming navigation button widget")
         try:
             await ctx.context.stream_widget(widget, copy_text=copy_text)
@@ -442,17 +453,6 @@ async def navigate_to_url(
             raise ValueError("Navigation button widget failed to stream.") from exc
         
         print("[NavigateTool] navigation button widget streamed")
-        
-        # Set ClientToolCall to trigger navigation in frontend
-        ctx.context.client_tool_call = ClientToolCall(
-            name="navigate_to_url",
-            arguments={
-                "url": url,
-                "open_in_new_tab": True,
-                "description": description or f"Navigasi ke {title}"
-            },
-        )
-        print("[NavigateTool] ClientToolCall set for navigation")
         
         return {
             "url": url,

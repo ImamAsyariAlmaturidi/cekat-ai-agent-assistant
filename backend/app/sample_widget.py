@@ -833,7 +833,7 @@ def render_nav_button_widget(data: NavButtonData) -> Card:
                         iconEnd="external-link",
                         onClickAction={
                             "type": "navigate",
-                            "payload": {"url": data.url}
+                            "payload": {"url": data.url, "openInNewTab": True}
                         }
                     )
                 ]

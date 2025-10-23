@@ -797,5 +797,76 @@
     ],
     "user_preferences": {},
     "session_metadata": {}
+  },
+  "thr_7daf8d2b": {
+    "session_id": "thr_7daf8d2b",
+    "created_at": "2025-10-23T20:27:47.813917",
+    "last_updated": "2025-10-23T20:28:01.722331",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:27:47.813937",
+        "role": "user",
+        "content": "What platforms can be integrated with Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      },
+      {
+        "timestamp": "2025-10-23T20:28:01.722310",
+        "role": "user",
+        "content": "workflows cekat gimana cara bikinya",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_db5e5628": {
+    "session_id": "thr_db5e5628",
+    "created_at": "2025-10-23T20:29:43.719374",
+    "last_updated": "2025-10-23T20:29:43.719397",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:29:43.719393",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_8c80180c": {
+    "session_id": "thr_8c80180c",
+    "created_at": "2025-10-23T20:30:09.264056",
+    "last_updated": "2025-10-23T20:30:09.264083",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:30:09.264078",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
+  },
+  "thr_ea842dad": {
+    "session_id": "thr_ea842dad",
+    "created_at": "2025-10-23T20:31:55.443927",
+    "last_updated": "2025-10-23T20:31:55.443958",
+    "conversation_history": [
+      {
+        "timestamp": "2025-10-23T20:31:55.443954",
+        "role": "user",
+        "content": "How to setup chatbot in Cekat AI?",
+        "tool_calls": null,
+        "metadata": null
+      }
+    ],
+    "user_preferences": {},
+    "session_metadata": {}
   }
 }

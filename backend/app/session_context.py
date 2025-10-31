@@ -1,11 +1,8 @@
-"""Session context management untuk ChatKit server."""
+"""Session context management untuk ChatKit server - in-memory only for performance."""
 
-import json
-import asyncio
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import dataclass
 
 @dataclass
 class ConversationTurn:
@@ -63,54 +60,16 @@ class SessionContext:
         return f"Session {self.session_id}: {total_turns} turns ({user_turns} user, {assistant_turns} assistant) - Last updated: {self.last_updated}"
 
 class SessionContextManager:
-    """Manager untuk mengelola session contexts."""
+    """Manager untuk mengelola session contexts - in-memory only, no file storage."""
     
-    def __init__(self, storage_path: str = "app/session_contexts.json"):
-        self.storage_path = Path(storage_path)
+    def __init__(self):
+        # In-memory storage only - no file I/O for performance
         self.sessions: Dict[str, SessionContext] = {}
-        self._load_sessions()
-    
-    def _load_sessions(self):
-        """Load sessions dari file storage."""
-        if self.storage_path.exists():
-            try:
-                with open(self.storage_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    for session_id, session_data in data.items():
-                        # Convert conversation_history back to ConversationTurn objects
-                        conversation_history = []
-                        for turn_data in session_data.get('conversation_history', []):
-                            turn = ConversationTurn(**turn_data)
-                            conversation_history.append(turn)
-                        
-                        session_data['conversation_history'] = conversation_history
-                        self.sessions[session_id] = SessionContext(**session_data)
-                print(f"📁 Loaded {len(self.sessions)} session contexts")
-            except Exception as e:
-                print(f"❌ Error loading session contexts: {e}")
-                self.sessions = {}
-        else:
-            print("📁 No existing session contexts found, starting fresh")
     
     def _save_sessions(self):
-        """Save sessions ke file storage."""
-        try:
-            # Convert ConversationTurn objects to dicts for JSON serialization
-            data = {}
-            for session_id, session in self.sessions.items():
-                session_dict = asdict(session)
-                # Convert ConversationTurn objects to dicts
-                conversation_history = []
-                for turn in session.conversation_history:
-                    conversation_history.append(asdict(turn))
-                session_dict['conversation_history'] = conversation_history
-                data[session_id] = session_dict
-            
-            with open(self.storage_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            print(f"💾 Saved {len(self.sessions)} session contexts")
-        except Exception as e:
-            print(f"❌ Error saving session contexts: {e}")
+        """No-op: Sessions are in-memory only for performance."""
+        # Do nothing - sessions stay in memory
+        pass
     
     def get_or_create_session(self, session_id: str) -> SessionContext:
         """Ambil atau buat session context baru."""
@@ -123,7 +82,8 @@ class SessionContextManager:
                 user_preferences={},
                 session_metadata={}
             )
-            print(f"🆕 Created new session context: {session_id}")
+            # Session created silently for performance
+            pass
         return self.sessions[session_id]
     
     def add_user_message(self, session_id: str, content: str, metadata: Optional[Dict[str, Any]] = None):
@@ -131,14 +91,14 @@ class SessionContextManager:
         session = self.get_or_create_session(session_id)
         session.add_turn('user', content, metadata=metadata)
         self._save_sessions()
-        print(f"👤 Added user message to session {session_id}")
+        # User message added silently for performance
     
     def add_assistant_message(self, session_id: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None, metadata: Optional[Dict[str, Any]] = None):
         """Tambahkan assistant message ke session."""
         session = self.get_or_create_session(session_id)
         session.add_turn('assistant', content, tool_calls=tool_calls, metadata=metadata)
         self._save_sessions()
-        print(f"🤖 Added assistant message to session {session_id}")
+        # Assistant message added silently for performance
     
     def get_session_context(self, session_id: str, max_turns: int = 10) -> str:
         """Ambil context string untuk session."""
@@ -176,7 +136,6 @@ class SessionContextManager:
         
         for session_id in sessions_to_remove:
             del self.sessions[session_id]
-            print(f"🗑️ Cleaned up old session: {session_id}")
         
         if sessions_to_remove:
             self._save_sessions()

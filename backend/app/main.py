@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 import os
+
+# Disable OpenAI tracing for performance - MUST be before any imports
+os.environ['OPENAI_TRACING_DISABLED'] = 'true'
+os.environ['OTEL_SDK_DISABLED'] = 'true'
 import uuid
 import hashlib
 from pathlib import Path
@@ -20,6 +24,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status, UploadFile
 from fastapi.responses import Response, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
+from urllib.parse import unquote
 
 from .server import (
     FactAssistantServer,
@@ -175,6 +180,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global request logger middleware
+@app.middleware("http")
+async def log_all_requests(request: Request, call_next):
+    try:
+        client_ip = getattr(request.client, "host", None)
+        print(f"[HTTP][REQ] {request.method} {request.url} ip={client_ip}")
+        # Log headers as a plain dict (can be large)
+        try:
+            headers_dict = {k: v for k, v in request.headers.items()}
+            print(f"[HTTP][HEADERS] {headers_dict}")
+        except Exception as e:
+            print(f"[HTTP][HEADERS][ERROR] {str(e)}")
+    except Exception as e:
+        print(f"[HTTP][REQ][ERROR] Failed to log request: {str(e)}")
+
+    response = await call_next(request)
+
+    try:
+        print(f"[HTTP][RES] {request.method} {request.url.path} -> {response.status_code}")
+    except Exception as e:
+        print(f"[HTTP][RES][ERROR] {str(e)}")
+
+    return response
+
 # Initialize attachment store as global singleton
 attachment_store = S3AttachmentStore()
 
@@ -197,6 +226,19 @@ def get_chatkit_server() -> FactAssistantServer:
 async def chatkit_endpoint(
     request: Request, server: FactAssistantServer = Depends(get_chatkit_server)
 ) -> Response:
+    # Log inbound request with dynamic URL info (from ChatKit-Domain-Key header)
+    try:
+        domain_key = request.headers.get("chatkit-domain-key", "")
+        parsed_url = None
+        if "|url=" in domain_key:
+            parsed_url = unquote(domain_key.split("|url=", 1)[1])
+        client_ip = getattr(request.client, "host", None)
+        print(
+            f"[CHATKIT][REQ] {request.method} {request.url.path} ip={client_ip} url={parsed_url} domain_key={domain_key}"
+        )
+    except Exception as e:
+        print(f"[CHATKIT][REQ][ERROR] Failed to log request: {str(e)}")
+
     payload = await request.body()
     result = await server.process(payload, {"request": request})
     if isinstance(result, StreamingResult):
@@ -228,22 +270,180 @@ async def discard_fact(fact_id: str) -> dict[str, Any]:
     return {"fact": fact.as_dict()}
 
 @app.post("/chatkit/files")
-async def direct_upload(file: UploadFile = File(...)) -> dict[str, Any]:
-    """Direct upload endpoint for ChatKit attachments - handles multipart/form-data."""
+async def chatkit_files_upload(request: Request) -> dict[str, Any]:
+    """Flexible upload endpoint for ChatKit attachments - handles both multipart/form-data and raw body."""
     try:
-        print(f"[DEBUG] Upload request received: {file.filename}, {file.content_type}")
+        # ===== DETAILED REQUEST LOGGING =====
+        print("=" * 80)
+        print("[CHATKIT][FILES] ========== NEW UPLOAD REQUEST ==========")
         
-        # Read file content
-        content = await file.read()
-        filename = file.filename or "unknown"
-        content_type = file.content_type or "application/octet-stream"
+        # Log request basics
+        client_ip = getattr(request.client, "host", None)
+        method = request.method
+        url_path = request.url.path
+        query_params = dict(request.query_params)
         
-        print(f"[DEBUG] File read: {len(content)} bytes, type: {content_type}")
+        print(f"[CHATKIT][FILES][REQ] Method: {method}")
+        print(f"[CHATKIT][FILES][REQ] Path: {url_path}")
+        print(f"[CHATKIT][FILES][REQ] Query params: {query_params}")
+        print(f"[CHATKIT][FILES][REQ] Client IP: {client_ip}")
         
-        # Generate attachment ID using the store method
+        # Log all headers
+        print("[CHATKIT][FILES][REQ] Headers:")
+        for header_name, header_value in request.headers.items():
+            if header_name.lower() in ["content-type", "content-length", "chatkit-domain-key"]:
+                print(f"  {header_name}: {header_value}")
+            else:
+                print(f"  {header_name}: {header_value[:100]}..." if len(str(header_value)) > 100 else f"  {header_name}: {header_value}")
+        
+        # Extract ChatKit domain info
+        domain_key = request.headers.get("chatkit-domain-key", "")
+        parsed_url = None
+        if "|url=" in domain_key:
+            parsed_url = unquote(domain_key.split("|url=", 1)[1])
+            print(f"[CHATKIT][FILES][REQ] Parsed URL: {parsed_url}")
+        
+        # Get content type
+        content_type_header = request.headers.get("content-type", "")
+        content_length = request.headers.get("content-length", "unknown")
+        print(f"[CHATKIT][FILES][REQ] Content-Type: {content_type_header}")
+        print(f"[CHATKIT][FILES][REQ] Content-Length: {content_length}")
+        
+        # ===== PROCESS REQUEST BASED ON CONTENT TYPE =====
+        content: bytes
+        filename: str = "unknown"
+        content_type: str = "application/octet-stream"
+        
+        if "multipart/form-data" in content_type_header:
+            print("[CHATKIT][FILES][REQ] Detected multipart/form-data")
+            
+            # Extract boundary from content-type
+            boundary = None
+            if "boundary=" in content_type_header:
+                boundary = content_type_header.split("boundary=")[1].strip('"\'')
+                print(f"[CHATKIT][FILES][REQ] Boundary: {boundary}")
+            
+            try:
+                print("[CHATKIT][FILES][REQ] Attempting to parse multipart form...")
+                form = await request.form()
+                print(f"[CHATKIT][FILES][REQ] Form parsed successfully. Fields: {list(form.keys())}")
+                
+                # Try to find file in form
+                file_obj = None
+                file_field_name = None
+                
+                # Check common field names first
+                for field_name in ["file", "attachment", "upload", "data"]:
+                    if field_name in form:
+                        value = form[field_name]
+                        print(f"[CHATKIT][FILES][REQ] Found field '{field_name}': type={type(value)}")
+                        if isinstance(value, UploadFile):
+                            file_obj = value
+                            file_field_name = field_name
+                            print(f"[CHATKIT][FILES][REQ] Field '{field_name}' is an UploadFile!")
+                            break
+                
+                # If not found, iterate through all fields
+                if file_obj is None:
+                    print("[CHATKIT][FILES][REQ] Searching through all form fields...")
+                    for key, value in form.items():
+                        print(f"[CHATKIT][FILES][REQ] Field '{key}': type={type(value)}, value={str(value)[:50] if not isinstance(value, UploadFile) else 'UploadFile'}")
+                        if isinstance(value, UploadFile):
+                            file_obj = value
+                            file_field_name = key
+                            print(f"[CHATKIT][FILES][REQ] Found UploadFile in field '{key}'!")
+                            break
+                
+                if file_obj is not None:
+                    print(f"[CHATKIT][FILES][REQ] Reading file from field '{file_field_name}'...")
+                    content = await file_obj.read()
+                    filename = file_obj.filename or "unknown"
+                    content_type = file_obj.content_type or "application/octet-stream"
+                    print(f"[CHATKIT][FILES][REQ] File read: {len(content)} bytes")
+                    print(f"[CHATKIT][FILES][REQ] Filename: {filename}")
+                    print(f"[CHATKIT][FILES][REQ] Content-Type: {content_type}")
+                else:
+                    error_msg = f"No file found in multipart form. Available fields: {list(form.keys())}"
+                    print(f"[CHATKIT][FILES][ERROR] {error_msg}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=error_msg
+                    )
+                    
+            except HTTPException:
+                raise
+            except Exception as e:
+                error_msg = str(e)
+                error_type = type(e).__name__
+                print(f"[CHATKIT][FILES][ERROR] Failed to parse multipart form!")
+                print(f"[CHATKIT][FILES][ERROR] Error type: {error_type}")
+                print(f"[CHATKIT][FILES][ERROR] Error message: {error_msg}")
+                import traceback
+                print("[CHATKIT][FILES][ERROR] Full traceback:")
+                traceback.print_exc()
+                
+                # Try to read raw body as fallback
+                print("[CHATKIT][FILES][REQ] Attempting fallback to raw body parsing...")
+                try:
+                    # Note: This might fail if body was already consumed
+                    content = await request.body()
+                    content_type = request.headers.get("content-type", "application/octet-stream")
+                    filename = f"fallback_upload_{len(content)}"
+                    print(f"[CHATKIT][FILES][REQ] Fallback successful: {len(content)} bytes")
+                except Exception as read_error:
+                    print(f"[CHATKIT][FILES][ERROR] Fallback also failed: {str(read_error)}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Failed to parse multipart form: {error_msg}. Fallback also failed: {str(read_error)}"
+                    )
+        else:
+            # Handle raw body upload
+            print("[CHATKIT][FILES][REQ] Detected raw body upload")
+            try:
+                content = await request.body()
+                content_type = request.headers.get("content-type", "application/octet-stream")
+                print(f"[CHATKIT][FILES][REQ] Raw body read: {len(content)} bytes")
+                
+                # Try to extract filename from content-disposition
+                content_disposition = request.headers.get("content-disposition", "")
+                if "filename=" in content_disposition:
+                    try:
+                        filename = content_disposition.split("filename=")[1].strip('"\'')
+                        print(f"[CHATKIT][FILES][REQ] Filename from header: {filename}")
+                    except:
+                        filename = f"direct_upload_{len(content)}"
+                        print(f"[CHATKIT][FILES][REQ] Using generated filename: {filename}")
+                else:
+                    filename = f"direct_upload_{len(content)}"
+                    print(f"[CHATKIT][FILES][REQ] Using generated filename: {filename}")
+            except Exception as e:
+                print(f"[CHATKIT][FILES][ERROR] Failed to read raw body: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to read request body: {str(e)}"
+                )
+        
+        # ===== VALIDATE CONTENT =====
+        if len(content) == 0:
+            print("[CHATKIT][FILES][ERROR] Empty file content!")
+            raise HTTPException(
+                status_code=400,
+                detail="Empty file content"
+            )
+        
+        print(f"[CHATKIT][FILES][REQ] Final file info:")
+        print(f"  - Size: {len(content)} bytes")
+        print(f"  - Filename: {filename}")
+        print(f"  - Content-Type: {content_type}")
+        
+        # ===== UPLOAD TO S3 =====
+        print("[CHATKIT][FILES][REQ] Generating attachment ID...")
         attachment_id = attachment_store.generate_attachment_id(content_type, None)
+        print(f"[CHATKIT][FILES][REQ] Attachment ID: {attachment_id}")
         
-        # Upload file to S3
+        print("[CHATKIT][FILES][REQ] Uploading to S3...")
         s3_key = attachment_store._get_s3_key(attachment_id)
         import io
         file_obj = io.BytesIO(content)
@@ -252,12 +452,15 @@ async def direct_upload(file: UploadFile = File(...)) -> dict[str, Any]:
         )
         
         if not upload_result["success"]:
+            print(f"[CHATKIT][FILES][ERROR] S3 upload failed: {upload_result.get('error')}")
             raise HTTPException(
                 status_code=500,
-                detail=f"S3 upload failed: {upload_result['error']}"
+                detail=f"S3 upload failed: {upload_result.get('error', 'Unknown error')}"
             )
         
-        # Store metadata
+        print(f"[CHATKIT][FILES][REQ] S3 upload successful. URL: {upload_result.get('url')}")
+        
+        # ===== STORE METADATA =====
         metadata = {
             "filename": filename,
             "content_type": content_type,
@@ -266,9 +469,9 @@ async def direct_upload(file: UploadFile = File(...)) -> dict[str, Any]:
             "s3_key": s3_key
         }
         attachment_store.metadata_store[attachment_id] = metadata
-        print(f"[DEBUG] Stored metadata for {attachment_id}: {metadata}")
+        print(f"[CHATKIT][FILES][REQ] Metadata stored: {metadata}")
         
-        # Return FileAttachment or ImageAttachment format
+        # ===== PREPARE RESPONSE =====
         if content_type.startswith("image/"):
             result = {
                 "id": attachment_id,
@@ -289,16 +492,27 @@ async def direct_upload(file: UploadFile = File(...)) -> dict[str, Any]:
                 "size": len(content)
             }
         
-        print(f"[DEBUG] Returning result: {result}")
+        print(f"[CHATKIT][FILES][REQ] Returning result: {result}")
+        print("=" * 80)
         return result
         
+    except HTTPException:
+        print("[CHATKIT][FILES][ERROR] HTTPException raised")
+        print("=" * 80)
+        raise
     except Exception as e:
-        print(f"[ERROR] Direct upload failed: {str(e)}")
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f"[CHATKIT][FILES][ERROR] Unexpected error!")
+        print(f"[CHATKIT][FILES][ERROR] Error type: {error_type}")
+        print(f"[CHATKIT][FILES][ERROR] Error message: {error_msg}")
         import traceback
+        print("[CHATKIT][FILES][ERROR] Full traceback:")
         traceback.print_exc()
+        print("=" * 80)
         raise HTTPException(
             status_code=500,
-            detail=f"Direct upload failed: {str(e)}"
+            detail=f"Direct upload failed: {error_msg}"
         )
 
 @app.post("/attachments/create")
@@ -334,46 +548,6 @@ async def create_attachment(request: Request) -> dict[str, Any]:
             detail=f"Failed to create attachment: {str(e)}"
         )
 
-@app.post("/chatkit/files")
-async def chatkit_direct_upload(request: Request) -> dict[str, Any]:
-    """Direct upload endpoint for ChatKit attachments."""
-    try:
-        # Get file content
-        body = await request.body()
-        content_type = request.headers.get("content-type", "application/octet-stream")
-        
-        # Generate attachment ID from content
-        attachment_id = attachment_store._generate_attachment_id("direct_upload", content_type)
-        
-        # Save file to disk
-        file_path = attachment_store._get_file_path(attachment_id)
-        with open(file_path, "wb") as f:
-            f.write(body)
-        
-        # Store metadata
-        metadata = {
-            "filename": f"direct_upload_{attachment_id[:8]}",
-            "content_type": content_type,
-            "size": len(body),
-            "status": "uploaded"
-        }
-        attachment_store.metadata_store[attachment_id] = metadata
-        print(f"[DEBUG] Stored metadata for {attachment_id}: {metadata}")
-        print(f"[DEBUG] Metadata store: {attachment_store.metadata_store}")
-        
-        return {
-            "success": True,
-            "message": "File uploaded successfully",
-            "attachment_id": attachment_id,
-            "size": len(body),
-            "content_type": content_type
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Direct upload failed: {str(e)}"
-        )
 
 @app.post("/chatkit/files/{attachment_id}")
 async def upload_file(attachment_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
@@ -466,11 +640,14 @@ async def handle_widget_action(request: Request) -> dict[str, Any]:
         action = data.get("action", {})
         item_id = data.get("itemId")
         
-        print(f"[DEBUG] Widget action received: {action}")
-        print(f"[DEBUG] Item ID: {item_id}")
+        print(f"🔵 [WIDGET] Widget action received: {action}")
+        print(f"🔵 [WIDGET] Item ID: {item_id}")
         
         action_type = action.get("type")
         payload = action.get("payload", {})
+        
+        print(f"🔍 [WIDGET] Action type: {action_type}")
+        print(f"🔍 [WIDGET] Payload: {payload}")
         
         if action_type == "navigation.open":
             url = payload.get("url")

@@ -6,7 +6,15 @@ from datetime import datetime
 from typing import Any, AsyncIterator
 from uuid import uuid4
 
-from agents import Agent, Runner
+from agents import Agent, Runner, WebSearchTool, ModelSettings, RunConfig
+try:
+    from agents import ImageGenerationTool
+    from openai.types.responses.tool_param import ImageGeneration
+    HAS_IMAGE_GENERATION = True
+except ImportError:
+    HAS_IMAGE_GENERATION = False
+    ImageGenerationTool = None
+    ImageGeneration = None
 from chatkit.agents import stream_agent_response
 from chatkit.server import ChatKitServer
 from chatkit.types import (
@@ -18,7 +26,9 @@ from chatkit.types import (
     ThreadStreamEvent,
     UserMessageItem,
 )
+from openai import max_retries
 from openai.types.responses import ResponseInputImageParam, ResponseInputFileParam
+from openai.types.shared import reasoning, reasoning_effort
 
 from .attachment_converter import CustomThreadItemConverter
 from .tools import (
@@ -29,6 +39,7 @@ from .tools import (
     match_cekat_docs_v1,
 # Removed docs widget import
     navigate_to_url,
+    generate_image,
 )
 from .agent_prompt import create_prompt_tool
 from .constants import INSTRUCTIONS, MODEL
@@ -63,12 +74,31 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
     def __init__(self, attachment_store=None) -> None:
         self.store: MemoryStore = MemoryStore()
         super().__init__(self.store, attachment_store=attachment_store)
-        tools = [save_fact, switch_theme, get_weather, match_cekat_docs_v1, navigate_to_url, create_prompt_tool]
+        # Build tools list
+        tools = [WebSearchTool(), match_cekat_docs_v1, create_prompt_tool, generate_image, navigate_to_url]
+        
+        # Add ImageGenerationTool if available (for partial_images support)
+        if HAS_IMAGE_GENERATION:
+            tools.append(ImageGenerationTool(
+                tool_config=ImageGeneration(
+                    type="image_generation",
+                    model="gpt-image-1-mini",
+                    quality="low",
+                    size="1024x1024",
+                    partial_images=1, 
+                ),
+            ))
+        
+        # Disable tracing for performance - set environment variable
+        import os
+        os.environ['OPENAI_TRACING_DISABLED'] = 'true'
+        
         self.assistant = Agent[FactAgentContext](
             model=MODEL,
             name="ChatKit Guide",
             instructions=INSTRUCTIONS,
-            tools=tools,  # type: ignore[arg-type]
+        
+            tools=tools,  # type: ignore[arg-type
         )
         self._thread_item_converter = self._init_thread_item_converter()
 
@@ -78,21 +108,19 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
         item: UserMessageItem | None,
         context: dict[str, Any],
     ) -> AsyncIterator[ThreadStreamEvent]:
-        print(f"[DEBUG] Server respond called with item: {type(item).__name__ if item else None}")
+        # Debug logging - log user request
         if item:
-            print(f"[DEBUG] Item content: {item.content}")
-            print(f"[DEBUG] Item attributes: {dir(item)}")
+            user_content = _user_message_text(item)
+            print(f"👤 [USER REQUEST] {user_content}")
         
         # Session context management
         session_id = thread.id
+        conversation_context = None
+        
         if item:
             # Extract user message content
             user_content = _user_message_text(item)
             session_manager.add_user_message(session_id, user_content)
-            
-            # Get conversation context
-            conversation_context = session_manager.get_session_context(session_id, max_turns=5)
-            print(f"📝 Session Context:\n{conversation_context}")
         
         agent_context = FactAgentContext(
             thread=thread,
@@ -119,52 +147,120 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
         if proper_input is not None:
             agent_input = proper_input
 
-        # Inject session context into agent input
+        # Inject session context into agent input - reduced to 1 for fastest processing
         if item and session_id in session_manager.sessions:
-            conversation_context = session_manager.get_session_context(session_id, max_turns=5)
+            conversation_context = session_manager.get_session_context(session_id, max_turns=2)
             if conversation_context and "CONVERSATION CONTEXT" in conversation_context:
                 # agent_input is a string, so we can directly prepend context
                 if isinstance(agent_input, str):
                     original_content = agent_input
                     agent_input = f"{conversation_context}\n\n{original_content}"
-                    print(f"🔄 Injected session context into AI prompt")
+                    # Session context injected silently for performance
                 else:
                     print(f"🔍 Unexpected agent_input type: {type(agent_input)}")
 
+        # Track request timing
+        import time
+        request_start = time.time()
+        
         result = Runner.run_streamed(
             self.assistant,
             agent_input,
             context=agent_context,
+            max_turns=3,  # Limit to 3 turns for speed
+            run_config=RunConfig(
+                model_settings=ModelSettings(       
+                    reasoning={"effort": "low"},
+                )
+            )
         )
 
         # Track assistant response
         assistant_response_parts = []
         tool_calls_used = []
+        assistant_content = ""
+        
+        turn_count = 0
+        image_generation_called = False
         
         async for event in stream_agent_response(agent_context, result):
-            # Track assistant response content
-            if hasattr(event, 'content') and event.content:
-                assistant_response_parts.append(str(event.content))
+            # Track image generation events - log EVERY event type for debugging
+            event_type = type(event).__name__
+            
+            # Check for tool call events
+            if hasattr(event, 'tool_call') and event.tool_call:
+                tool_name = getattr(event.tool_call, 'name', 'unknown')
+                tool_args = getattr(event.tool_call, 'arguments', {})
+                print(f"🔧 [SERVER] Tool call detected: {tool_name}")
+                print(f"🔧 [SERVER] Tool arguments: {tool_args}")
+                if tool_name == 'image_generation' or tool_name == 'generate_image':
+                    image_generation_called = True
+                    print(f"🖼️ [SERVER] Image generation tool triggered!")
+            
+            # Track assistant response content from ThreadItemUpdated
+            if hasattr(event, 'item') and event.item and hasattr(event.item, 'content'):
+                # Extract text content from item
+                for block in event.item.content:
+                    if hasattr(block, 'text') and block.text:
+                        content_str = block.text
+                        assistant_response_parts.append(content_str)
+                        assistant_content += content_str + " "
             
             # Track tool calls
             if hasattr(event, 'tool_call') and event.tool_call:
+                tool_name = getattr(event.tool_call, 'name', 'unknown')
+                tool_args = getattr(event.tool_call, 'arguments', {})
+                print(f"📋 [SERVER] Tracking tool call: {tool_name}")
                 tool_calls_used.append({
-                    'name': getattr(event.tool_call, 'name', 'unknown'),
-                    'arguments': getattr(event.tool_call, 'arguments', {})
+                    'name': tool_name,
+                    'arguments': tool_args
                 })
+                turn_count += 1
+                
             
             yield event
         
-        # Save assistant response to session context
+        # Build assistant content from parts
         if assistant_response_parts and item:
             assistant_content = " ".join(assistant_response_parts).strip()
+            
+            # Content already processed above
             if assistant_content:
+                # Logging removed for performance
                 session_manager.add_assistant_message(
                     session_id, 
                     assistant_content, 
                     tool_calls=tool_calls_used if tool_calls_used else None
                 )
-                print(f"🤖 Saved assistant response to session {session_id}")
+        
+        # Stream navigation widget AFTER text response completes
+        navigate_url_info = agent_context.request_context.get('navigate_url_info')
+        if navigate_url_info and item:
+            from .sample_widget import render_nav_button_widget, nav_button_copy_text, NavButtonData
+            from chatkit.server import stream_widget
+            
+            try:
+                url = navigate_url_info.get('url', '')
+                page_name = url.split('/')[-1] or url.split('/')[-2]
+                page_title = page_name.replace('-', ' ').title()
+                
+                widget_data = NavButtonData(
+                    title=page_title,
+                    description=navigate_url_info.get('description', ''),
+                    button_text=navigate_url_info.get('link_text', 'Buka Halaman'),
+                    url=url,
+                    icon="🔗"
+                )
+                widget = render_nav_button_widget(widget_data)
+                copy_text = nav_button_copy_text(widget_data)
+                
+                print(f"🔄 [SERVER] Streaming navigation widget for: {url}")
+                # Stream widget events AFTER text response
+                async for widget_event in stream_widget(thread, widget, copy_text=copy_text):
+                    yield widget_event
+                print(f"✅ [SERVER] Navigation widget streamed")
+            except Exception as e:
+                print(f"❌ [SERVER] Failed to stream widget: {e}")
         
         return
 
@@ -177,26 +273,16 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
         **kwargs: Any,
     ) -> AsyncIterator[ThreadStreamEvent]:
         """Handle widget actions like button clicks."""
-        print(f"[DEBUG] Action received: {action}")
-        print(f"[DEBUG] Action type: {type(action)}")
-        print(f"[DEBUG] Thread: {thread}")
-        print(f"[DEBUG] Context: {context}")
-        print(f"[DEBUG] Args: {args}")
-        print(f"[DEBUG] Kwargs: {kwargs}")
+        # Debug logging removed for performance
         
         # Action is an Action object, not a dict
         action_type = getattr(action, 'type', None)
         payload = getattr(action, 'payload', {})
         
-        print(f"[DEBUG] Action type: {action_type}")
-        print(f"[DEBUG] Payload: {payload}")
-        
         if action_type == "navigation.open":
             url = payload.get("url") if isinstance(payload, dict) else getattr(payload, 'url', None)
             if url:
-                print(f"[DEBUG] Navigation action: Opening URL {url}")
-                # For now, just log the action
-                # Frontend onAction callback will handle the navigation
+                # Navigation handled by frontend
                 pass
         
         # Return empty iterator for other actions

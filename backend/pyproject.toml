@@ -13,6 +13,7 @@ dependencies = [
     "requests>=2.31,<3",
     "supabase",
     "boto3>=1.40.56",
+    "Pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]

@@ -18,19 +18,78 @@ class CustomThreadItemConverter:
     async def attachment_to_message_content(self, input: Attachment) -> ResponseInputImageParam | ResponseInputFileParam:
         """Convert attachment to message content sesuai dokumentasi ChatKit."""
         try:
+            print(f"[ATTACHMENT_CONVERTER] Converting attachment {input.id}")
+            print(f"[ATTACHMENT_CONVERTER] Input mime_type: {input.mime_type}")
+            print(f"[ATTACHMENT_CONVERTER] Input name: {input.name}")
+            
             # Get attachment bytes menggunakan helper function
             content = await read_attachment_bytes(input.id)
+            print(f"[ATTACHMENT_CONVERTER] Read {len(content)} bytes from attachment")
+            
+            # Get correct mime_type from metadata store if available (to fix multipart/form-data issue)
+            mime_type = input.mime_type
+            from .main import attachment_store
+            if hasattr(attachment_store, 'metadata_store') and input.id in attachment_store.metadata_store:
+                metadata = attachment_store.metadata_store[input.id]
+                stored_content_type = metadata.get('content_type') or metadata.get('mime_type')
+                if stored_content_type and stored_content_type != 'multipart/form-data':
+                    mime_type = stored_content_type
+                    print(f"[ATTACHMENT_CONVERTER] Using mime_type from metadata: {mime_type}")
+                else:
+                    print(f"[ATTACHMENT_CONVERTER] Metadata mime_type also invalid: {stored_content_type}")
+            
+            # Validate mime_type - reject multipart/form-data
+            if mime_type == 'multipart/form-data' or not mime_type or mime_type.startswith('multipart/'):
+                # Try to detect from filename or content
+                if input.name:
+                    import mimetypes
+                    detected_type, _ = mimetypes.guess_type(input.name)
+                    if detected_type:
+                        mime_type = detected_type
+                        print(f"[ATTACHMENT_CONVERTER] Detected mime_type from filename: {mime_type}")
+                    else:
+                        # Default based on extension
+                        if input.name.lower().endswith(('.jpg', '.jpeg')):
+                            mime_type = 'image/jpeg'
+                        elif input.name.lower().endswith('.png'):
+                            mime_type = 'image/png'
+                        elif input.name.lower().endswith('.pdf'):
+                            mime_type = 'application/pdf'
+                        else:
+                            mime_type = 'application/octet-stream'
+                        print(f"[ATTACHMENT_CONVERTER] Using default mime_type: {mime_type}")
+                else:
+                    # Try to detect from content (magic bytes)
+                    if len(content) >= 4:
+                        if content[:4] == b'\xff\xd8\xff\xe0' or content[:4] == b'\xff\xd8\xff\xe1':
+                            mime_type = 'image/jpeg'
+                        elif content[:8] == b'\x89PNG\r\n\x1a\n':
+                            mime_type = 'image/png'
+                        elif content[:4] == b'%PDF':
+                            mime_type = 'application/pdf'
+                        else:
+                            mime_type = 'application/octet-stream'
+                        print(f"[ATTACHMENT_CONVERTER] Detected mime_type from content: {mime_type}")
+                    else:
+                        mime_type = 'application/octet-stream'
+                        print(f"[ATTACHMENT_CONVERTER] Using fallback mime_type: {mime_type}")
+            
+            print(f"[ATTACHMENT_CONVERTER] Final mime_type: {mime_type}")
             
             # Create data URL
             data = (
                 "data:"
-                + str(input.mime_type)
+                + str(mime_type)
                 + ";base64,"
                 + base64.b64encode(content).decode("utf-8")
             )
+            print(f"[ATTACHMENT_CONVERTER] Created data URL (length: {len(data)} chars)")
             
-            # Return sesuai type attachment menggunakan isinstance
-            if isinstance(input, ImageAttachment):
+            # Return sesuai type attachment - check mime_type instead of isinstance for better detection
+            # Treat as image if mime_type starts with image/ or if it's an ImageAttachment
+            is_image = isinstance(input, ImageAttachment) or (mime_type and mime_type.startswith('image/'))
+            
+            if is_image:
                 # For Agent SDK, we need to embed image in message content
                 return {
                     "type": "message",
@@ -65,23 +124,10 @@ class CustomThreadItemConverter:
         """Convert ThreadItem to agent input, handling attachments properly."""
         from chatkit.types import UserMessageItem
         
-        print(f"[DEBUG] Converting ThreadItem: {type(item).__name__}")
-        print(f"[DEBUG] ThreadItem attributes: {dir(item)}")
+        # Debug logging removed for performance
         
         if isinstance(item, UserMessageItem):
-            print(f"[DEBUG] Processing UserMessageItem with {len(item.content)} content parts")
-            print(f"[DEBUG] UserMessageItem content: {item.content}")
-            
-            # Check if UserMessageItem has attachments attribute
-            if hasattr(item, 'attachments') and item.attachments:
-                print(f"[DEBUG] Found attachments in UserMessageItem: {len(item.attachments)}")
-                for i, attachment in enumerate(item.attachments):
-                    print(f"[DEBUG] Attachment {i}: {attachment.id}, type: {attachment.mime_type}")
-            else:
-                print(f"[DEBUG] No attachments attribute in UserMessageItem")
-                print(f"[DEBUG] UserMessageItem has attachments attr: {hasattr(item, 'attachments')}")
-                if hasattr(item, 'attachments'):
-                    print(f"[DEBUG] UserMessageItem attachments value: {getattr(item, 'attachments', None)}")
+            # Debug logging removed for performance
             
             # Extract text content
             text_parts = []
@@ -139,35 +185,26 @@ class CustomThreadItemConverter:
             
             # Process each content part
             for i, part in enumerate(item.content):
-                print(f"[DEBUG] Processing content part {i}: {type(part).__name__}")
-                print(f"[DEBUG] Content part attributes: {dir(part)}")
-                print(f"[DEBUG] Content part dict: {part.__dict__ if hasattr(part, '__dict__') else 'No __dict__'}")
+                # Debug logging removed for performance
                 
                 # Check for text content
                 if hasattr(part, 'text') and part.text:
                     text_parts.append(part.text)
-                    print(f"[DEBUG] Added text: {part.text[:50]}...")
                 
-                # Check for attachment content - try different attribute names
+                # Check for attachment content - debug logging removed for performance
                 attachment_obj = None
                 if hasattr(part, 'attachment') and part.attachment:
                     attachment_obj = part.attachment
-                    print(f"[DEBUG] Found attachment via 'attachment' attr: {attachment_obj.id}")
                 elif hasattr(part, 'file') and part.file:
                     attachment_obj = part.file
-                    print(f"[DEBUG] Found attachment via 'file' attr: {attachment_obj.id}")
                 elif hasattr(part, 'image') and part.image:
                     attachment_obj = part.image
-                    print(f"[DEBUG] Found attachment via 'image' attr: {attachment_obj.id}")
                 elif hasattr(part, 'media') and part.media:
                     attachment_obj = part.media
-                    print(f"[DEBUG] Found attachment via 'media' attr: {attachment_obj.id}")
                 elif hasattr(part, 'data') and part.data:
                     attachment_obj = part.data
-                    print(f"[DEBUG] Found attachment via 'data' attr: {attachment_obj.id}")
                 elif hasattr(part, 'content') and part.content:
                     attachment_obj = part.content
-                    print(f"[DEBUG] Found attachment via 'content' attr: {attachment_obj.id}")
                 
                 # Try to find attachment in any attribute
                 if not attachment_obj:
@@ -176,46 +213,17 @@ class CustomThreadItemConverter:
                             attr_value = getattr(part, attr_name)
                             if attr_value and hasattr(attr_value, 'id'):
                                 attachment_obj = attr_value
-                                print(f"[DEBUG] Found attachment via '{attr_name}' attr: {attachment_obj.id}")
                                 break
                 
                 if attachment_obj:
-                    print(f"[DEBUG] Processing attachment: {attachment_obj.id}, type: {attachment_obj.mime_type}")
                     # Convert attachment to message content
                     try:
                         attachment_content = await self.attachment_to_message_content(attachment_obj)
                         attachment_contents.append(attachment_content)
-                        print(f"[DEBUG] Successfully converted attachment {attachment_obj.id} to content")
                     except Exception as e:
                         print(f"[ERROR] Failed to convert attachment: {e}")
-                        import traceback
-                        traceback.print_exc()
                         # Add fallback text
                         text_parts.append(f"[Attachment: {attachment_obj.name or 'Unknown file'}]")
-                else:
-                    print(f"[DEBUG] No attachment found in content part")
-                    print(f"[DEBUG] Part type: {type(part)}")
-                    print(f"[DEBUG] Part has text attr: {hasattr(part, 'text')}")
-                    print(f"[DEBUG] Part has attachment attr: {hasattr(part, 'attachment')}")
-                    print(f"[DEBUG] Part has file attr: {hasattr(part, 'file')}")
-                    print(f"[DEBUG] Part has image attr: {hasattr(part, 'image')}")
-                    print(f"[DEBUG] Part has media attr: {hasattr(part, 'media')}")
-                    print(f"[DEBUG] Part has data attr: {hasattr(part, 'data')}")
-                    print(f"[DEBUG] Part has content attr: {hasattr(part, 'content')}")
-                    print(f"[DEBUG] Part has url attr: {hasattr(part, 'url')}")
-                    print(f"[DEBUG] Part has src attr: {hasattr(part, 'src')}")
-                    
-                    # Print all attribute values
-                    for attr_name in dir(part):
-                        if not attr_name.startswith('_'):
-                            try:
-                                attr_value = getattr(part, attr_name)
-                                if not callable(attr_value):
-                                    print(f"[DEBUG] {attr_name}: {attr_value}")
-                            except:
-                                pass
-            
-            print(f"[DEBUG] Final result - text_parts: {len(text_parts)}, attachment_contents: {len(attachment_contents)}")
             
             # Combine text and attachments - return proper format for Agent SDK
             if text_parts and attachment_contents:
@@ -234,7 +242,6 @@ class CustomThreadItemConverter:
                     "role": "user",
                     "content": content
                 }]
-                print(f"[DEBUG] Returning list with single message containing text and {len(attachment_contents)} attachments")
                 return result
             elif attachment_contents:
                 # Only attachments, no text
@@ -250,18 +257,14 @@ class CustomThreadItemConverter:
                     "role": "user",
                     "content": content
                 }]
-                print(f"[DEBUG] Returning list with single message containing {len(attachment_contents)} attachments only")
                 return result
             elif text_parts:
                 # Only text, no attachments
                 result = " ".join(text_parts).strip()
-                print(f"[DEBUG] Returning text only: {result}")
                 return result
             else:
                 # Empty message
-                print(f"[DEBUG] Returning empty message")
                 return ""
         
         # For other types, return None to use default handling
-        print(f"[DEBUG] Returning None for {type(item).__name__}")
         return None

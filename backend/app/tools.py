@@ -1,15 +1,20 @@
 """Function tools for the ChatKit assistant."""
 
+import asyncio
 import logging
+import time
 from datetime import datetime
 from typing import Any, Literal, Union
 from uuid import uuid4
 
-from agents import RunContextWrapper, function_tool
+from agents import RunContextWrapper, function_tool, model_settings
 from chatkit.agents import AgentContext, ClientToolCall
-from openai.types.shared import reasoning_effort
+from openai.types.shared import reasoning, reasoning_effort
 from pydantic import ConfigDict, Field
 from typing import Annotated
+import os
+import base64
+from openai import AsyncOpenAI, OpenAI, max_retries
 
 from .facts import Fact, fact_store
 from .weather import (
@@ -17,7 +22,13 @@ from .weather import (
     retrieve_weather,
     normalize_unit as normalize_temperature_unit,
 )
-from .sample_widget import render_weather_widget, weather_widget_copy_text
+from .sample_widget import (
+    render_weather_widget, 
+    weather_widget_copy_text,
+    ImageGenerationWidgetData,
+    render_image_generation_widget,
+    image_generation_widget_copy_text
+)
 # Removed docs widget imports
 from .cekat_docs_memory import get_cekat_docs_rag
 
@@ -167,7 +178,7 @@ async def get_weather(
 
 
 @function_tool(
-    description_override="MANDATORY TOOL: Gunakan tool ini untuk SEMUA pertanyaan yang berkaitan dengan Cekat, CekatAI, atau Cekat AI. Tool ini mencari informasi dokumen Cekat menggunakan sistem pencarian semantik. WAJIB digunakan untuk menjawab pertanyaan tentang fitur, cara penggunaan, dokumentasi, atau apapun yang berkaitan dengan Cekat. Trigger words: Cekat, CekatAI, platform, features, integration, API, documentation, setup, configuration, AI Agent, chatbot, omnichannel, CRM, webhook, automation."
+    description_override="MANDATORY TOOL untuk MENCARI INFORMASI SPESIFIK dari dokumentasi Cekat. PAKAI TOOL INI untuk: 1) User bertanya tentang harga, subscription, paket, plans (Wajib pakai tool!), 2) User bertanya cara membuat, cara setup, cara menggunakan fitur, 3) User butuh info detail technical atau dokumentasi. Tool ini mengambil informasi terkini dari dokumentasi Cekat. JANGAN jawab generic jika user tanya harga/paket - HARUS pakai tool ini!"
 )
 async def match_cekat_docs_v1(
     ctx: RunContextWrapper[FactAgentContext],
@@ -175,28 +186,35 @@ async def match_cekat_docs_v1(
 ) -> dict[str, str | None]:
     """Search Cekat documentation using RAG system with Supabase pgvector."""
     session_id = ctx.context.thread.id
-    print("[CekatDocsRAG] tool invoked", {"query": query, "session_id": session_id})
+    start_time = time.time()
+    print(f"🔍 [TOOL] match_cekat_docs_v1 started - query: '{query[:50]}'")
     
     try:
         # Get RAG instance
         rag = get_cekat_docs_rag()
         
-        # Search for relevant documents - get top 10
+        # Search for relevant documents - limit to 10 for comprehensive results
         results = rag.search_docs(query, limit=10)
         
         if results:
-            # Format results for the AI
+            # Format results for the AI with truncated content
             formatted_results = []
             for doc in results:
+                # Truncate content to prevent huge responses - reduced to 500 for speed
+                content = doc.get("content", "")
+                if len(content) > 500:  # Limit content to 500 chars
+                    content = content[:500] + "..."
+                
                 formatted_results.append({
                     "title": doc.get("title", "Untitled"),
-                    "content": doc.get("content", ""),
+                    "content": content,
                     "url": doc.get("url", ""),
                     "category": doc.get("category", ""),
                     "similarity": doc.get("similarity", 0)
                 })
             
-            print("[CekatDocsRAG] search succeeded", {"result_count": len(formatted_results)})
+            elapsed = time.time() - start_time
+            print(f"✅ [TOOL] match_cekat_docs_v1 completed in {elapsed:.2f}s - Found {len(formatted_results)} results")
             
             return {
                 "query": query,
@@ -204,7 +222,8 @@ async def match_cekat_docs_v1(
                 "status": "success"
             }
         else:
-            print("[CekatDocsRAG] no results found")
+            elapsed = time.time() - start_time
+            print(f"⚠️ [TOOL] match_cekat_docs_v1 completed in {elapsed:.2f}s - No results found")
             return {
                 "query": query,
                 "results": [],
@@ -212,7 +231,8 @@ async def match_cekat_docs_v1(
             }
             
     except Exception as exc:
-        print("[CekatDocsRAG] search failed", {"error": str(exc)})
+        elapsed = time.time() - start_time
+        print(f"❌ [TOOL] match_cekat_docs_v1 failed in {elapsed:.2f}s - Error: {str(exc)[:100]}")
         return {
             "query": query,
             "results": [],
@@ -344,7 +364,7 @@ async def create_cekat_docs_widget_from_results(
 
 
 @function_tool(
-    description_override="Create a clickable link in text for URLs. This creates a simple link that users can click to navigate to a page."
+    description_override="Use this to enable navigation to Cekat pages when user mentions a feature or asks to access/go to a page. Keywords: workflows, chatbots, broadcast, ai-agent, agent-management, products, orders, analytics, connected-platforms. Use when relevant to the conversation."
 )
 async def navigate_to_url(
     ctx: RunContextWrapper[FactAgentContext],
@@ -352,8 +372,10 @@ async def navigate_to_url(
     link_text: str = "",
     description: str = ""
 ) -> dict[str, str | None]:
-    """Create a clickable link in text for URLs."""
-    print("[NavigateTool] creating clickable link", {"url": url, "link_text": link_text})
+    """Enable navigation to Cekat pages. MANDATORY to call after answering questions about Cekat features."""
+    start_time = time.time()
+    print(f"🧭 [TOOL] navigate_to_url STARTED - URL: {url}, link_text: {link_text}")
+    
     
     # Hardcoded Cekat URLs mapping
     cekat_urls = {
@@ -402,7 +424,7 @@ async def navigate_to_url(
     url_lower = url.lower().strip()
     if url_lower in cekat_urls:
         url = cekat_urls[url_lower]
-        print(f"[NavigateTool] Mapped '{url_lower}' to '{url}'")
+        # URL mapping done silently for performance
     
     # Validasi URL
     if not url.startswith(("http://", "https://")):
@@ -415,16 +437,15 @@ async def navigate_to_url(
         link_text = f"Buka {page_name.replace('-', ' ').title()}"
     
     try:
-        # Set ClientToolCall to trigger navigation in frontend
-        ctx.context.client_tool_call = ClientToolCall(
-            name="navigate_to_url",
-            arguments={
-                "url": url,
-                "open_in_new_tab": True,
-                "description": description or f"Navigasi ke {link_text}"
-            },
-        )
-        print("[NavigateTool] ClientToolCall set for navigation")
+        # Store URL in context for later widget streaming (after response completes)
+        ctx.context.request_context['navigate_url_info'] = {
+            'url': url,
+            'link_text': link_text,
+            'description': description
+        }
+        
+        elapsed = time.time() - start_time
+        print(f"✅ [TOOL] navigate_to_url completed in {elapsed:.2f}s")
         
         return {
             "url": url,
@@ -433,7 +454,8 @@ async def navigate_to_url(
             "status": "success"
         }
     except Exception as exc:
-        print("[NavigateTool] navigation failed", {"error": str(exc)})
+        elapsed = time.time() - start_time
+        print(f"❌ [TOOL] navigate_to_url failed in {elapsed:.2f}s - Error: {str(exc)}")
         return {
             "url": url,
             "status": "error",
@@ -441,6 +463,171 @@ async def navigate_to_url(
         }
 
 
+@function_tool(
+    description_override="Generate images and visual content using AI. Use this when user explicitly asks to 'create', 'generate', 'make', or 'bikin' images, illustrations, logos, designs, or any visual content."
+)
+async def generate_image(
+    ctx: RunContextWrapper[FactAgentContext],
+    prompt: str,
+    size: Literal["256x256", "512x512", "square", "portrait", "landscape"] | str = "512x512",
+    partial_images: int = 1,
+) -> dict[str, str | bool | None]:
+    """Generate images using OpenAI's Responses API without streaming."""
+    print("=" * 80)
+    print("🎨 [IMAGE GENERATION TOOL] TOOL DIPANGGIL!")
+    print(f"🎨 [IMAGE] Prompt: {prompt}")
+    print(f"🎨 [IMAGE] Size: {size}")
+    print(f"🎨 [IMAGE] Partial images: {partial_images}")
+    print("=" * 80)
+    logging.info(f"[IMAGE GENERATION] Tool called with prompt: {prompt[:100]}")
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("[IMAGE] ERROR: OPENAI_API_KEY not found")
+        raise RuntimeError("Image generation requires OPENAI_API_KEY to be configured on the server.")
+    
+    client = OpenAI(api_key=api_key)
+
+    try:
+        print(f"🎨 [IMAGE] Using Responses API with model=gpt-5")
+        
+        # Use Responses API without streaming
+        response = await asyncio.to_thread(
+            client.responses.create,
+            model="gpt-5",
+            input=prompt,
+            tools=[
+                {
+                    "type": "image_generation",
+                    "background": "transparent",
+                    "quality": "low",
+                }
+            ],
+        )
+        
+        # Extract image data from output
+        image_data = [
+            output.result
+            for output in response.output
+            if output.type == "image_generation_call"
+        ]
+        
+        if not image_data:
+            print("[IMAGE] ERROR: No images received")
+            raise RuntimeError("Image generation returned no images.")
+        
+        image_urls = []
+        import io
+        
+        # Helper function untuk upload ke S3 di background
+        async def upload_to_s3_async(image_bytes: bytes, idx: int) -> str | None:
+            """Upload image to S3 asynchronously, return S3 URL or None if failed."""
+            try:
+                from .main import attachment_store
+                attachment_id = attachment_store.generate_attachment_id("image/png", None)
+                s3_key = attachment_store._get_s3_key(attachment_id)
+                file_obj = io.BytesIO(image_bytes)
+                
+                # Upload S3 di thread terpisah agar tidak blocking
+                upload_result = await asyncio.to_thread(
+                    attachment_store.s3_client.upload_fileobj,
+                    file_obj, s3_key, "image/png"
+                )
+                
+                if upload_result["success"]:
+                    s3_url = f"https://{attachment_store.s3_client.bucket_name}.s3.{attachment_store.s3_client.region}.amazonaws.com/{s3_key}"
+                    print(f"🖼️ [IMAGE] Background upload #{idx} completed: {s3_url}")
+                    return s3_url
+                else:
+                    print(f"🖼️ [IMAGE] Background upload #{idx} failed: {upload_result.get('error')}")
+                    return None
+            except Exception as e:
+                print(f"🖼️ [IMAGE] Background upload #{idx} error: {e}")
+                return None
+        
+        # Process images - stream widget dulu dengan data URL, upload S3 di background
+        upload_tasks = []
+        
+        for idx, image_base64 in enumerate(image_data):
+            try:
+                # Convert to data URL untuk immediate display
+                data_url = f"data:image/png;base64,{image_base64}"
+                
+                # Get image dimensions from base64 data
+                try:
+                    from PIL import Image as PILImage  # type: ignore[import-untyped]
+                    import io
+                    image_bytes = base64.b64decode(image_base64)
+                    img = PILImage.open(io.BytesIO(image_bytes))
+                    img_width, img_height = img.size
+                    print(f"🖼️ [IMAGE] Image #{idx} dimensions: {img_width}x{img_height}")
+                except ImportError:
+                    print(f"🖼️ [IMAGE] PIL/Pillow not available, skipping dimension detection")
+                    img_width, img_height = None, None
+                except Exception as e:
+                    print(f"🖼️ [IMAGE] Could not get dimensions for image #{idx}: {e}")
+                    img_width, img_height = None, None
+                
+                # Stream widget immediately dengan data URL
+                print(f"🖼️ [IMAGE] Creating widget for image #{idx} (data URL length: {len(data_url)})")
+                widget_data = ImageGenerationWidgetData(
+                    image_url=data_url,
+                    prompt=prompt,
+                    size=size,
+                
+                )
+                print(f"🖼️ [IMAGE] Rendering widget for image #{idx}")
+                widget = render_image_generation_widget(widget_data)
+                copy_text = image_generation_widget_copy_text(widget_data)
+                print(f"🖼️ [IMAGE] Streaming widget for image #{idx}...")
+                try:
+                    await ctx.context.stream_widget(widget, copy_text=copy_text)
+                    print(f"✅ [IMAGE] Widget #{idx} streamed successfully!")
+                except Exception as stream_error:
+                    print(f"❌ [IMAGE] ERROR streaming widget #{idx}: {stream_error}")
+                    import traceback
+                    traceback.print_exc()
+                    raise
+                
+                # Decode dan prepare upload ke S3 di background
+                image_bytes = base64.b64decode(image_base64)
+                upload_task = upload_to_s3_async(image_bytes, idx)
+                upload_tasks.append((idx, upload_task))
+                
+            except Exception as e:
+                print(f"🖼️ [IMAGE] Error processing image #{idx}: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Start S3 uploads in background but don't wait - return immediately
+        # This allows user to see images immediately while S3 uploads happen async
+        if upload_tasks:
+            print(f"🔄 [IMAGE] Starting {len(upload_tasks)} background S3 upload(s) (non-blocking)...")
+            # Create background task to handle uploads without blocking response
+            async def handle_uploads():
+                for idx, task in upload_tasks:
+                    try:
+                        s3_url = await task
+                        if s3_url:
+                            print(f"✅ [IMAGE] Background upload #{idx} succeeded: {s3_url}")
+                    except Exception as e:
+                        print(f"❌ [IMAGE] Background upload #{idx} error: {e}")
+            
+            # Fire and forget - don't wait for completion
+            asyncio.create_task(handle_uploads())
+        
+        # Return immediately with minimal info - images already visible via widget stream
+        # Don't include data URLs in response to avoid exceeding max output size (1MB limit)
+        return {
+            "status": "generated",
+            "prompt": prompt,
+            "count": len(image_data),
+            "message": f"Successfully generated {len(image_data)} image(s). Images have been displayed in the widget above. Upload to S3 is processing in the background."
+        }
+        
+    except Exception as exc:
+        print(f"[IMAGE] ERROR: {str(exc)}")
+        raise RuntimeError(f"Image generation failed: {exc}") from exc
 
 
 # Export all tools for easy importing
@@ -451,5 +638,6 @@ __all__ = [
     "match_cekat_docs_v1",
     "navigate_to_url",
     "create_prompt_tool",
+    "generate_image",
     "FactAgentContext",
 ]

@@ -124,19 +124,10 @@ export function ChatKitPanel({
               newWindow.focus();
             } else {
               console.warn(
-                "[ChatKitPanel] Failed to open new tab - popup blocked?"
+                "[ChatKitPanel] Failed to open new tab - popup blocked? Falling back to same-tab navigation"
               );
-              // Try alternative method: create link and click it
-              console.log("[ChatKitPanel] Trying link click method");
-              const link = document.createElement("a");
-              link.href = url;
-              link.target = "_blank";
-              link.rel = "noopener noreferrer";
-              link.style.display = "none";
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              console.log("[ChatKitPanel] Used link click method");
+              // Fallback: redirect in same tab instead of trying to open new tab
+              window.location.href = url;
             }
           } else {
             console.log("[ChatKitPanel] Navigating in current tab:", url);
@@ -163,9 +154,94 @@ export function ChatKitPanel({
     },
     widgets: {
       async onAction(action, item) {
-        console.log("[ChatKitPanel] Widget action received:", { action, item });
+        console.log("[ChatKitPanel] 🔵 Widget action received:", action.type);
+        console.log("[ChatKitPanel] 🔵 Action payload:", action.payload);
+        console.log("[ChatKitPanel] 🔵 Full action object:", { action, item });
 
+        // Handle navigation.open
+        if (action.type === "navigation.open") {
+          console.log("[Widget] Handling navigation.open");
+          const url = action.payload?.url;
+          if (url) {
+            console.log("[Widget] Opening URL:", url);
+            const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+
+            if (newWindow) {
+              console.log("[Widget] Successfully opened new tab");
+              newWindow.focus();
+            } else {
+              console.warn("[Widget] Failed to open new tab - popup blocked?");
+              // Try alternative method: create link and click it
+              const link = document.createElement("a");
+              link.href = url;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              link.style.display = "none";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+          }
+          return;
+        }
+
+        // Handle image.download or image_generation.download
+        if (
+          action.type === "image.download" ||
+          action.type === "image_generation.download"
+        ) {
+          console.log(`[Widget] Handling ${action.type}`);
+          const url = action.payload?.url;
+          console.log("[Widget] Download URL:", url);
+
+          if (!url) {
+            console.error("[Widget] No URL provided");
+            return;
+          }
+
+          try {
+            console.log("[Widget] Fetching image from:", url);
+            const response = await fetch(url);
+
+            if (!response.ok) {
+              throw new Error(`Failed to fetch image: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            console.log("[Widget] Blob created, size:", blob.size);
+
+            // Create download link
+            const blobUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = blobUrl;
+
+            // Extract filename from URL or use default
+            const urlObj = new URL(url);
+            const pathname = urlObj.pathname;
+            const filename = pathname.split("/").pop() || "generated-image.png";
+            link.download = filename;
+
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+
+            console.log("[Widget] Image downloaded successfully:", filename);
+          } catch (error) {
+            console.error("[Widget] Failed to download image:", error);
+            alert(
+              "Failed to download image. Please try right-clicking the image and selecting 'Save Image As'."
+            );
+          }
+          return;
+        }
+
+        // For other actions, send to backend
         try {
+          console.log("[Widget] Sending action to backend:", action.type);
           const response = await fetch("/api/widget-action", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -174,46 +250,6 @@ export function ChatKitPanel({
 
           const result = await response.json();
           console.log("[ChatKitPanel] Widget action response:", result);
-
-          // Handle specific action types
-          if (action.type === "navigation.open") {
-            const url = action.payload?.url;
-            if (url) {
-              console.log("[ChatKitPanel] Widget action - Opening URL:", url);
-              const newWindow = window.open(
-                url,
-                "_blank",
-                "noopener,noreferrer"
-              );
-
-              if (newWindow) {
-                console.log(
-                  "[ChatKitPanel] Widget action - Successfully opened new tab"
-                );
-                newWindow.focus();
-              } else {
-                console.warn(
-                  "[ChatKitPanel] Widget action - Failed to open new tab - popup blocked?"
-                );
-                // Try alternative method: create link and click it
-                console.log(
-                  "[ChatKitPanel] Widget action - Trying link click method"
-                );
-                const link = document.createElement("a");
-                link.href = url;
-                link.target = "_blank";
-                link.rel = "noopener noreferrer";
-                link.style.display = "none";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                console.log(
-                  "[ChatKitPanel] Widget action - Used link click method"
-                );
-              }
-            }
-          }
-
           return result;
         } catch (error) {
           console.error("[ChatKitPanel] Widget action failed:", error);

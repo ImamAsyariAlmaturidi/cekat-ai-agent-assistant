@@ -4,6 +4,8 @@ import base64
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Sequence, Union
+import io
+from PIL import Image as PILImage
 
 from chatkit.widgets import (
     ActionConfig,
@@ -752,24 +754,18 @@ class UrlWidgetData:
 def render_url_widget(data: UrlWidgetData) -> Card:
     """Build a URL navigation widget."""
     
-    # Create button
+    # Create button with URL navigation
     button = Button(
-        color="primary",
         label=data.label,
         style="primary",
+        variant="solid",
+        size="lg",
         iconEnd="external-link",
         block=True,
-        onClickAction=ActionConfig(
-            type="client_tool_call",
-            payload={
-                "name": "navigate_to_url",
-                "arguments": {
-                    "url": data.url,
-                    "open_in_new_tab": True,
-                    "description": f"Navigating to {data.url}"
-                }
-            }
-        )
+        onClickAction={
+            "type": "navigation.open",
+            "payload": {"url": data.url}
+        }
     )
     
     # Create children list
@@ -812,31 +808,22 @@ class NavButtonData:
 
 def render_nav_button_widget(data: NavButtonData) -> Card:
     """Build a simple navigation button widget."""
+    print(f"[RENDER_NAV_BUTTON_WIDGET] Rendering nav button with title: {data.title}, url: {data.url}")
     
     return Card(
         key="nav_button_widget",
         size="sm",
         children=[
-            Col(
-                align="center",
-                gap=3,
-                padding=1,
-                children=[
-                    Title(
-                        textAlign="center",
-                        value=data.title,
-                        size="sm"
-                    ),
-                    Button(
-                        label=data.button_text,
-                        style="primary",
-                        iconEnd="external-link",
-                        onClickAction={
-                            "type": "navigate",
-                            "payload": {"url": data.url, "openInNewTab": True}
-                        }
-                    )
-                ]
+            Button(
+                label=data.title,
+                style="primary",
+                iconEnd="external-link",
+                block=True,
+                onClickAction=ActionConfig(
+                    type="navigation.open",
+                    payload={"url": data.url},
+                    handler="client"
+                )
             )
         ]
     )
@@ -845,6 +832,75 @@ def render_nav_button_widget(data: NavButtonData) -> Card:
 def nav_button_copy_text(data: NavButtonData) -> str:
     """Generate copy text for nav button widget."""
     return f"{data.title}\n\n{data.description}\n\nURL: {data.url}"
+
+
+# Image Generation Widget Components
+@dataclass(frozen=True)
+class ImageGenerationWidgetData:
+    """Data structure for image generation widget."""
+    image_url: str
+    prompt: str
+    size: str = "1024x1024"
+
+
+def _get_image_dimensions_from_data_url(data_url: str) -> tuple[int, int]:
+    """Extract image dimensions from data URL."""
+    try:
+        # Extract base64 data from data URL
+        if data_url.startswith("data:image"):
+            base64_data = data_url.split(",")[1]
+        else:
+            base64_data = data_url
+        
+        # Decode base64 to bytes
+        image_bytes = base64.b64decode(base64_data)
+        
+        # Open image with PIL to get dimensions
+        img = PILImage.open(io.BytesIO(image_bytes))
+        return img.size  # Returns (width, height)
+    except Exception as e:
+        print(f"[WIDGET] Error getting image dimensions: {e}")
+        # Default to 1024x1024 if can't determine
+        return (1024, 1024)
+
+
+def render_image_generation_widget(data: ImageGenerationWidgetData) -> Card:
+    """Build an image generation display widget."""
+    print(f"[RENDER_IMAGE_GENERATION_WIDGET] Rendering image generation widget with URL: {data.image_url}")
+    
+    return Card(
+        key="image_generation",
+        size="md",
+        theme="dark",
+        children=[
+            Image(
+                src=data.image_url,
+                frame=True,
+                alt=f"Generated image: {data.prompt}",
+            ),
+            Row(
+                children=[
+                    Button(
+                        color="primary",
+                        label="Download Image",
+                        style="primary",
+                        iconEnd="star",
+                        block=True,
+                        onClickAction=ActionConfig(
+                            type="image.download",
+                            payload={"url": data.image_url},
+                            handler="client"
+                        )
+                    )
+                ]
+            )
+        ]
+    )
+
+
+def image_generation_widget_copy_text(data: ImageGenerationWidgetData) -> str:
+    """Generate copy text for image generation widget."""
+    return f"Generated image from prompt: '{data.prompt}'\n\nImage URL: {data.image_url}"
 
 
 def _compact(items: Sequence[WidgetComponent | None]) -> list[WidgetComponent]:

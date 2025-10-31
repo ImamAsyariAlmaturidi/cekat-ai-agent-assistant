@@ -2,6 +2,7 @@
 
 import os
 import logging
+import hashlib
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
@@ -12,8 +13,8 @@ from supabase import create_client, Client
 from openai import OpenAI
 
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging - set to WARNING to reduce noise
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 class CekatDocsRAG:
@@ -25,6 +26,10 @@ class CekatDocsRAG:
         self.supabase_url = os.getenv("SUPABASE_URL")
         self.supabase_key = os.getenv("SUPABASE_ANON_KEY")
         
+        # Initialize query cache for faster response
+        self.query_cache = {}
+        self.max_cache_size = 100  # Limit cache to prevent memory issues
+        
         # Check if Supabase is configured
         if not self.supabase_url or not self.supabase_key:
             logger.warning("Supabase not configured - URL or key missing")
@@ -34,9 +39,11 @@ class CekatDocsRAG:
         if self.supabase_url and self.supabase_key:
             try:
                 self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
-                logger.info("Supabase client initialized")
+                # Supabase initialized silently
+                pass
             except Exception as e:
-                logger.error(f"Failed to initialize Supabase client: {e}")
+                # Error logged silently
+                pass
                 self.supabase = None
         else:
             logger.warning("Supabase not configured, setting client to None")
@@ -46,9 +53,11 @@ class CekatDocsRAG:
             openai_key = os.getenv("OPENAI_API_KEY")
             if openai_key:
                 self.openai_client = OpenAI(api_key=openai_key)
-                logger.info("OpenAI client initialized")
+                # OpenAI initialized silently
+                pass
             else:
-                logger.warning("OpenAI API key not found, embeddings will not work")
+                # Warning logged silently
+                pass
                 self.openai_client = None
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI client: {e}")
@@ -58,11 +67,11 @@ class CekatDocsRAG:
         self.docs_table = "documents"
         self.embeddings_table = "documents"  # Using same table for simplicity
         
-        logger.info("CekatDocsRAG initialized")
+        # Initialized silently for performance
     
     
     def search_docs(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search for relevant Cekat documentation using vector similarity."""
+        """Search for relevant Cekat documentation using vector similarity with caching."""
         try:
             # Check if clients are available
             if not self.openai_client:
@@ -73,6 +82,15 @@ class CekatDocsRAG:
                 logger.warning("Supabase client not available - returning empty results")
                 return []
             
+            # Generate cache key from query
+            query_normalized = query.lower().strip()
+            query_hash = hashlib.md5(f"{query_normalized}_{limit}".encode()).hexdigest()
+            
+            # Check cache first
+            if query_hash in self.query_cache:
+                # Cache hit - return silently
+                return self.query_cache[query_hash]
+            
             # Generate embedding for query using small model
             response = self.openai_client.embeddings.create(
                 model="text-embedding-3-small",
@@ -81,7 +99,7 @@ class CekatDocsRAG:
             
             query_embedding = response.data[0].embedding
             
-            # Search using Supabase RPC function - get top 10 documents
+            # Search using Supabase RPC function - default to 5 for faster response
             result = self.supabase.rpc('match_documents', {
                 'query_embedding': query_embedding,
                 'match_count': limit,
@@ -89,10 +107,18 @@ class CekatDocsRAG:
             }).execute()
             
             if result.data:
-                logger.info(f"Found {len(result.data)} relevant documents")
+                # Found documents silently
+                pass
+                
+                # Cache the results
+                if len(self.query_cache) >= self.max_cache_size:
+                    # Remove oldest entry (simple FIFO)
+                    self.query_cache.pop(next(iter(self.query_cache)))
+                
+                self.query_cache[query_hash] = result.data
                 return result.data
             else:
-                logger.info("No relevant documents found")
+                # No documents found silently
                 return []
                 
         except Exception as e:
